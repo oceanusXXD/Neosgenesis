@@ -17,7 +17,7 @@ Core components for the intelligent decision-making system
 # 导入核心组件
 from .controller import MainController
 from .reasoner import PriorReasoner
-from .path_generator import PathGenerator, DeepSeekDrivenDimensionCreator
+from .path_generator import PathGenerator, LLMDrivenDimensionCreator
 from .mab_converger import MABConverger
 from .rag_seed_generator import RAGSeedGenerator
 
@@ -49,7 +49,7 @@ __all__ = [
     "MainController",
     "PriorReasoner",
     "PathGenerator", 
-    "DeepSeekDrivenDimensionCreator",
+    "LLMDrivenDimensionCreator",
     "MABConverger",
     "RAGSeedGenerator",
     
