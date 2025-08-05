@@ -73,7 +73,7 @@ class RAGSeedGenerator:
         初始化RAG种子生成器
         
         Args:
-            api_key: DeepSeek API密钥（向后兼容）
+            api_key: LLM API密钥（向后兼容）
             search_engine: 搜索引擎类型（向后兼容）
             web_search_client: 共享的Web搜索客户端（依赖注入）
             llm_client: 共享的LLM客户端（依赖注入）
