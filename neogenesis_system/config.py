@@ -6,7 +6,8 @@
 Configuration file - stores all system configurations
 """
 
-# DeepSeek API配置
+# ==================== 传统DeepSeek API配置（向后兼容） ====================
+# 注意：这些常量保留用于向后兼容，新代码应使用LLM_PROVIDERS_CONFIG
 DEEPSEEK_API_BASE = "https://api.deepseek.com/v1"
 DEEPSEEK_MODEL = "deepseek-chat"
 DEEPSEEK_CHAT_ENDPOINT = "https://api.deepseek.com/chat/completions"
@@ -221,7 +222,7 @@ RAG_CONFIG = {
 
 # 特性开关
 FEATURE_FLAGS = {
-    "enable_deepseek_self_assessment": True,
+    "enable_llm_self_assessment": True,
     "enable_alternative_thinking": True,
     "enable_performance_tracking": True,
     "enable_cache": True,
@@ -230,5 +231,160 @@ FEATURE_FLAGS = {
     "enable_rag_enhancement": True,             # 新增：启用RAG增强思维种子生成
     "enable_hybrid_seed_generation": False,     # 新增：启用混合种子生成策略
     "enable_real_time_information": True,       # 新增：启用实时信息获取
-    "enable_information_verification": True     # 新增：启用信息验证
+    "enable_information_verification": True,    # 新增：启用信息验证
+    "enable_multi_llm_support": True           # 新增：启用多LLM支持
+}
+
+# ==================== 多LLM配置系统 ====================
+
+# LLM提供商配置
+LLM_PROVIDERS_CONFIG = {
+    "deepseek": {
+        "display_name": "DeepSeek",
+        "provider_type": "deepseek",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "default_model": "deepseek-chat",
+        "available_models": ["deepseek-chat", "deepseek-coder"],
+        "base_url": "https://api.deepseek.com",
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "timeout": (30, 180),
+        "max_retries": 3,
+        "retry_delay_base": 2.0,
+        "request_interval": 1.0,
+        "features": ["chat", "coding", "chinese", "reasoning"],
+        "cost_per_1k_tokens": {"input": 0.00014, "output": 0.00028},
+        "context_window": 32768,
+        "enabled": True
+    },
+    
+    "openai": {
+        "display_name": "OpenAI GPT",
+        "provider_type": "openai", 
+        "api_key_env": "OPENAI_API_KEY",
+        "default_model": "gpt-3.5-turbo",
+        "available_models": [
+            "gpt-3.5-turbo", "gpt-3.5-turbo-16k",
+            "gpt-4", "gpt-4-turbo-preview", "gpt-4o", "gpt-4o-mini"
+        ],
+        "base_url": None,  # 使用默认
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "timeout": (30, 120),
+        "max_retries": 3,
+        "retry_delay_base": 2.0,
+        "request_interval": 0.5,
+        "features": ["chat", "function_calling", "vision", "json_mode"],
+        "cost_per_1k_tokens": {"input": 0.0015, "output": 0.002},
+        "context_window": 16384,
+        "enabled": False  # 默认禁用，需要API密钥
+    },
+    
+    "anthropic": {
+        "display_name": "Anthropic Claude",
+        "provider_type": "anthropic",
+        "api_key_env": "ANTHROPIC_API_KEY", 
+        "default_model": "claude-3-sonnet-20240229",
+        "available_models": [
+            "claude-3-opus-20240229", "claude-3-sonnet-20240229", 
+            "claude-3-haiku-20240307", "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022"
+        ],
+        "base_url": None,  # 使用默认
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "timeout": (30, 180),
+        "max_retries": 3,
+        "retry_delay_base": 2.0,
+        "request_interval": 1.0,
+        "features": ["chat", "long_context", "reasoning", "analysis"],
+        "cost_per_1k_tokens": {"input": 0.003, "output": 0.015},
+        "context_window": 200000,  # Claude支持长上下文
+        "enabled": False  # 默认禁用，需要API密钥
+    },
+    
+    "azure_openai": {
+        "display_name": "Azure OpenAI",
+        "provider_type": "azure_openai",
+        "api_key_env": "AZURE_OPENAI_API_KEY",
+        "azure_endpoint_env": "AZURE_OPENAI_ENDPOINT",
+        "api_version": "2024-02-15-preview",
+        "default_model": "gpt-35-turbo",
+        "available_models": ["gpt-35-turbo", "gpt-4", "gpt-4-32k"],
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "timeout": (30, 120),
+        "max_retries": 3,
+        "retry_delay_base": 2.0,
+        "request_interval": 0.5,
+        "features": ["chat", "function_calling", "enterprise"],
+        "cost_per_1k_tokens": {"input": 0.0015, "output": 0.002},
+        "context_window": 16384,
+        "enabled": False  # 默认禁用，需要API密钥和端点
+    },
+    
+    "ollama": {
+        "display_name": "Ollama (本地)",
+        "provider_type": "ollama",
+        "api_key_env": None,  # 本地服务不需要API密钥
+        "default_model": "llama2",
+        "available_models": ["llama2", "mistral", "codellama", "phi"],
+        "base_url": "http://localhost:11434",
+        "max_tokens": 2000,
+        "temperature": 0.7,
+        "timeout": (10, 300),  # 本地推理可能较慢
+        "max_retries": 2,
+        "retry_delay_base": 1.0,
+        "request_interval": 0.1,
+        "features": ["chat", "local", "offline", "privacy"],
+        "cost_per_1k_tokens": {"input": 0.0, "output": 0.0},  # 本地免费
+        "context_window": 4096,
+        "enabled": False  # 默认禁用，需要本地Ollama服务
+    }
+}
+
+# 默认LLM配置
+DEFAULT_LLM_CONFIG = {
+    "primary_provider": "auto",          # 主要提供商（auto=自动检测可用的提供商）
+    "preferred_providers": [             # 首选提供商顺序（按优先级）
+        "deepseek", "openai", "anthropic", "ollama"
+    ],
+    "fallback_providers": [              # 回退提供商（按优先级）
+        "openai", "anthropic", "ollama", "deepseek"
+    ],
+    "auto_fallback": True,               # 是否自动回退
+    "fallback_on_error": True,          # 错误时是否回退
+    "fallback_on_rate_limit": True,     # 速率限制时是否回退
+    "load_balancing": False,             # 是否启用负载均衡
+    "provider_selection_strategy": "priority",  # 选择策略: priority, round_robin, random
+    "health_check_interval": 300,       # 健康检查间隔（秒）
+    "performance_tracking": True,       # 是否跟踪性能
+    "cost_tracking": True,              # 是否跟踪成本
+    "usage_logging": True               # 是否记录使用情况
+}
+
+# LLM管理器配置
+LLM_MANAGER_CONFIG = {
+    "max_concurrent_requests": 3,       # 最大并发请求数
+    "request_queue_size": 100,          # 请求队列大小
+    "timeout_buffer": 5,                # 超时缓冲（秒）
+    "health_check_timeout": 10,         # 健康检查超时（秒）
+    "stats_retention_days": 30,         # 统计数据保留天数
+    "enable_request_caching": True,     # 启用请求缓存
+    "cache_ttl_seconds": 300,           # 缓存过期时间（秒）
+    "enable_response_validation": True, # 启用响应验证
+    "log_all_interactions": False,      # 是否记录所有交互（调试用）
+    "enable_provider_metrics": True     # 启用提供商指标
+}
+
+# 成本控制配置
+COST_CONTROL_CONFIG = {
+    "enable_cost_limits": True,         # 启用成本限制
+    "daily_cost_limit_usd": 10.0,      # 每日成本限制（美元）
+    "monthly_cost_limit_usd": 100.0,   # 每月成本限制（美元）
+    "cost_alert_threshold": 0.8,       # 成本警告阈值（比例）
+    "enable_cost_optimization": True,  # 启用成本优化
+    "prefer_cheaper_models": True,     # 优先使用便宜的模型
+    "token_usage_tracking": True,      # 跟踪token使用量
+    "detailed_cost_breakdown": True    # 详细的成本分解
 }
