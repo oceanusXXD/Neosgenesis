@@ -29,12 +29,12 @@ from config import PROMPT_TEMPLATES
 logger = logging.getLogger(__name__)
 
 
-class DeepSeekDrivenDimensionCreator:
-    """DeepSeek驱动的动态维度创建器"""
+class LLMDrivenDimensionCreator:
+    """LLM驱动的动态维度创建器"""
     
     def __init__(self, api_key: str = "", llm_client=None):
         """
-        初始化DeepSeek驱动的维度创建器
+        初始化LLM驱动的维度创建器
         
         Args:
             api_key: API密钥（向后兼容）
@@ -52,18 +52,18 @@ class DeepSeekDrivenDimensionCreator:
         
         # 性能和历史记录
         self.performance_history = defaultdict(list)
-        self.discovered_dimensions = defaultdict(dict)  # 存储DeepSeek发现的维度
+        self.discovered_dimensions = defaultdict(dict)  # 存储LLM发现的维度
         self.dimension_usage_frequency = defaultdict(int)  # 维度使用频率
         self.dimension_creation_patterns = defaultdict(list)  # 维度创建模式
         self.task_dimension_mapping = defaultdict(list)  # 任务-维度映射关系
         
-        # DeepSeek专用属性
-        self.deepseek_session_history = []  # DeepSeek会话历史
+        # LLM专用属性
+        self.llm_session_history = []  # LLM会话历史
         self.dimension_quality_scores = defaultdict(float)  # 维度质量评分
         self.creative_dimension_cache = {}  # 创新维度缓存
         
-        # 🚀 DeepSeek元优势函数评估系统
-        self.deepseek_capability_tracking = {
+        # 🚀 LLM元优势函数评估系统
+        self.llm_capability_tracking = {
             'task_type_advantages': defaultdict(lambda: {'success_count': 0, 'total_count': 0, 'avg_quality': 0.5}),
             'domain_expertise_scores': defaultdict(float),
             'complexity_handling_ability': defaultdict(float),
@@ -72,24 +72,24 @@ class DeepSeekDrivenDimensionCreator:
             'advantage_compensation_strategies': {}
         }
         
-        logger.info("🤖 DeepSeek驱动的维度创建器已初始化 (使用强化版客户端)")
+        logger.info("🤖 LLM驱动的维度创建器已初始化 (使用统一客户端接口)")
 
     def create_dynamic_dimensions(self, user_query: str, execution_context: Optional[Dict] = None) -> List[ReasoningPath]:
-        """使用DeepSeek创建动态维度"""
+        """使用LLM创建动态维度"""
         
-        logger.info(f"🤖 开始DeepSeek维度创建: {user_query[:50]}...")
+        logger.info(f"🤖 开始LLM维度创建: {user_query[:50]}...")
         
         try:
             # 构建维度创建提示
-            deepseek_prompt = self._build_dimension_creation_prompt(user_query, execution_context)
+            llm_prompt = self._build_dimension_creation_prompt(user_query, execution_context)
             
-            # 调用DeepSeek进行推理
-            deepseek_response = self.api_caller.call_api(deepseek_prompt, temperature=0.8)
+            # 调用LLM进行推理
+            llm_response = self.api_caller.call_api(llm_prompt, temperature=0.8)
             
-            # 解析DeepSeek响应
-            dimension_result = self._parse_deepseek_dimension_response(deepseek_response)
+            # 解析LLM响应
+            dimension_result = self._parse_llm_dimension_response(llm_response)
             
-            # 基于DeepSeek分析生成思维路径
+            # 基于LLM分析生成思维路径
             reasoning_paths = self._create_reasoning_paths_from_analysis(
                 dimension_result, user_query, execution_context
             )
@@ -98,12 +98,12 @@ class DeepSeekDrivenDimensionCreator:
             return reasoning_paths
             
         except Exception as e:
-            logger.error(f"❌ DeepSeek维度创建失败: {e}")
+            logger.error(f"❌ LLM维度创建失败: {e}")
             # 回退到智能维度生成
             return self._create_fallback_reasoning_paths(user_query, execution_context, str(e))
         
     def _build_dimension_creation_prompt(self, user_query: str, execution_context: Optional[Dict] = None) -> str:
-        """构建DeepSeek维度创建提示"""
+        """构建LLM维度创建提示"""
         
         context_info = ""
         if execution_context:
@@ -178,8 +178,8 @@ class DeepSeekDrivenDimensionCreator:
         similar_tasks.sort(key=lambda x: x.get('similarity', 0), reverse=True)
         return similar_tasks[:5]  # 返回最相似的5个任务
     
-    def _parse_deepseek_dimension_response(self, response: str) -> Dict[str, Any]:
-        """解析DeepSeek的维度创建响应"""
+    def _parse_llm_dimension_response(self, response: str) -> Dict[str, Any]:
+        """解析LLM的维度创建响应"""
         
         try:
             result = parse_json_response(response)
@@ -781,7 +781,7 @@ class PathGenerator:
         # 🔧 依赖注入：为维度创建器传入共享客户端
         self.dimension_selector = None
         if llm_client:
-            self.dimension_selector = DeepSeekDrivenDimensionCreator(api_key, llm_client=llm_client)
+            self.dimension_selector = LLMDrivenDimensionCreator(api_key, llm_client=llm_client)
         else:
             logger.warning("⚠️ 维度创建器无法初始化，缺少LLM客户端")
         
