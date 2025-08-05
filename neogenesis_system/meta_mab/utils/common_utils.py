@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def parse_json_response(response: str) -> Optional[Dict[str, Any]]:
     """
-    解析DeepSeek的JSON响应
+    解析LLM的JSON响应
     
     Args:
         response: API响应字符串
@@ -25,7 +25,7 @@ def parse_json_response(response: str) -> Optional[Dict[str, Any]]:
     """
     # 首先验证输入类型
     if not isinstance(response, (str, bytes, bytearray)):
-        logger.error(f"❌ 解析DeepSeek响应失败: 输入类型错误，期望字符串，实际得到 {type(response)}")
+        logger.error(f"❌ 解析LLM响应失败: 输入类型错误，期望字符串，实际得到 {type(response)}")
         logger.error(f"原始响应: {str(response)[:200]}...")
         return None  # 返回None表示无效输入
     
@@ -34,12 +34,12 @@ def parse_json_response(response: str) -> Optional[Dict[str, Any]]:
         try:
             response = response.decode('utf-8')
         except UnicodeDecodeError as e:
-            logger.error(f"❌ 解析DeepSeek响应失败: 编码错误 {e}")
+            logger.error(f"❌ 解析LLM响应失败: 编码错误 {e}")
             return None
     
     # 检查空字符串
     if not response or not response.strip():
-        logger.error("❌ 解析DeepSeek响应失败: 响应为空")
+        logger.error("❌ 解析LLM响应失败: 响应为空")
         return None
     
     try:
@@ -60,10 +60,10 @@ def parse_json_response(response: str) -> Optional[Dict[str, Any]]:
             return json.loads(json_match.group())
             
     except json.JSONDecodeError as e:
-        logger.error(f"❌ 解析DeepSeek响应失败: JSON格式错误 {e}")
+        logger.error(f"❌ 解析LLM响应失败: JSON格式错误 {e}")
         logger.error(f"原始响应: {response[:200]}...")
     except Exception as e:
-        logger.error(f"❌ 解析DeepSeek响应失败: {e}")
+        logger.error(f"❌ 解析LLM响应失败: {e}")
         logger.error(f"原始响应: {response[:200]}...")
     
     # 解析失败时返回None，让调用方决定如何处理
