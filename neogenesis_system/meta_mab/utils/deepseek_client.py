@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-强化版 DeepSeek API 客户端
-Enhanced DeepSeek API Client with advanced features
+强化版 DeepSeek API 客户端 - 支持统一LLM接口
+Enhanced DeepSeek API Client with Unified LLM Interface
 
 特性:
+- 实现统一LLM客户端接口
 - 使用 requests.Session 提高性能
 - 配置化的重试逻辑和超时控制
 - 精细的错误处理和结构化日志
@@ -26,38 +27,56 @@ from enum import Enum
 from contextlib import contextmanager
 
 from config import API_CONFIG, DEEPSEEK_CHAT_ENDPOINT, DEEPSEEK_MODEL
+from ..llm_base import (
+    BaseLLMClient, LLMConfig, LLMResponse, LLMMessage, LLMUsage, 
+    LLMProvider, LLMErrorType, create_error_response
+)
 
 logger = logging.getLogger(__name__)
 
 
-class APIErrorType(Enum):
-    """API错误类型枚举"""
-    AUTHENTICATION = "authentication_error"
-    RATE_LIMIT = "rate_limit_error" 
-    SERVER_ERROR = "server_error"
-    NETWORK_ERROR = "network_error"
-    TIMEOUT_ERROR = "timeout_error"
-    PARSE_ERROR = "parse_error"
-    UNKNOWN_ERROR = "unknown_error"
-
+# APIErrorType已迁移到LLMErrorType，保持向后兼容
+APIErrorType = LLMErrorType
 
 @dataclass
 class APIResponse:
-    """API响应数据结构"""
+    """API响应数据结构 - 向后兼容"""
     success: bool
     content: str = ""
     raw_response: Optional[Dict[str, Any]] = None
-    error_type: Optional[APIErrorType] = None
+    error_type: Optional[LLMErrorType] = None
     error_message: str = ""
     status_code: int = 0
     response_time: float = 0.0
     tokens_used: int = 0
     model_used: str = ""
+    
+    def to_llm_response(self, provider: str = "deepseek") -> LLMResponse:
+        """转换为统一的LLMResponse格式"""
+        usage = None
+        if self.tokens_used > 0:
+            usage = LLMUsage(
+                prompt_tokens=0,  # DeepSeek目前不单独返回
+                completion_tokens=self.tokens_used,
+                total_tokens=self.tokens_used
+            )
+        
+        return LLMResponse(
+            success=self.success,
+            content=self.content,
+            provider=provider,
+            model=self.model_used,
+            response_time=self.response_time,
+            usage=usage,
+            error_type=self.error_type,
+            error_message=self.error_message,
+            raw_response=self.raw_response
+        )
 
 
 @dataclass  
 class ClientConfig:
-    """客户端配置"""
+    """客户端配置 - 兼容旧版本的配置结构"""
     api_key: str
     base_url: str = "https://api.deepseek.com"
     model: str = DEEPSEEK_MODEL
@@ -71,6 +90,24 @@ class ClientConfig:
     enable_metrics: bool = True
     proxies: Optional[Dict[str, str]] = None
     request_interval: float = 1.0  # 🔧 新增：请求间隔时间(秒)
+    
+    def to_llm_config(self) -> LLMConfig:
+        """转换为统一的LLMConfig格式"""
+        return LLMConfig(
+            provider=LLMProvider.DEEPSEEK,
+            api_key=self.api_key,
+            model_name=self.model,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            base_url=self.base_url,
+            timeout=self.timeout,
+            max_retries=self.max_retries,
+            retry_delay_base=self.retry_delay_base,
+            enable_cache=self.enable_cache,
+            cache_ttl=self.cache_ttl,
+            proxies=self.proxies,
+            request_interval=self.request_interval
+        )
 
 
 @dataclass
@@ -99,11 +136,12 @@ class ClientMetrics:
         return self.total_response_time / self.successful_requests
 
 
-class DeepSeekClient:
+class DeepSeekClient(BaseLLMClient):
     """
-    强化版 DeepSeek API 客户端
+    强化版 DeepSeek API 客户端 - 实现统一LLM接口
     
     特性:
+    - 继承BaseLLMClient统一接口
     - 高性能会话复用
     - 智能重试机制
     - 请求缓存
@@ -111,80 +149,111 @@ class DeepSeekClient:
     - 结构化错误处理
     """
     
-    def __init__(self, config: ClientConfig):
+    def __init__(self, config: Union[ClientConfig, LLMConfig]):
         """
-        初始化客户端
+        初始化客户端 - 支持新旧两种配置格式
         
         Args:
-            config: 客户端配置
+            config: 客户端配置（ClientConfig或LLMConfig）
         """
-        self.config = config
+        # 配置转换
+        if isinstance(config, LLMConfig):
+            # 新的统一配置格式
+            llm_config = config
+            self.config = self._convert_llm_config_to_client_config(config)
+        else:
+            # 旧的ClientConfig格式
+            self.config = config
+            llm_config = config.to_llm_config()
+        
+        # 调用父类初始化
+        super().__init__(llm_config)
+        
+        # DeepSeek特有的指标系统
         self.metrics = ClientMetrics()
         
         # 初始化 requests.Session
         self.session = requests.Session()
         self.session.headers.update({
-            'Authorization': f'Bearer {config.api_key}',
+            'Authorization': f'Bearer {self.config.api_key}',
             'Content-Type': 'application/json',
             'User-Agent': 'Neogenesis-System/1.0'
         })
         
         # 配置代理
-        if config.proxies:
-            self.session.proxies.update(config.proxies)
+        if self.config.proxies:
+            self.session.proxies.update(self.config.proxies)
         
         # 请求缓存
         self._cache: Dict[str, tuple] = {}  # key -> (response, timestamp)
         
         # 🔧 新增：请求频率控制
         self._last_request_time = 0
-        self._request_interval = getattr(config, 'request_interval', 1.0)  # 默认1秒间隔
+        self._request_interval = getattr(self.config, 'request_interval', 1.0)  # 默认1秒间隔
         
         logger.info(f"🚀 DeepSeekClient 初始化完成")
-        logger.info(f"   模型: {config.model}")
-        logger.info(f"   缓存: {'启用' if config.enable_cache else '禁用'}")
-        logger.info(f"   指标: {'启用' if config.enable_metrics else '禁用'}")
+        logger.info(f"   模型: {self.config.model}")
+        logger.info(f"   缓存: {'启用' if self.config.enable_cache else '禁用'}")
+        logger.info(f"   指标: {'启用' if self.config.enable_metrics else '禁用'}")
         logger.info(f"   请求间隔: {self._request_interval}s")
     
-    def chat_completion(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        model: Optional[str] = None,
-        system_message: Optional[str] = None,
-        enable_cache: Optional[bool] = None
-    ) -> APIResponse:
+    def _convert_llm_config_to_client_config(self, llm_config: LLMConfig) -> ClientConfig:
+        """将统一LLMConfig转换为DeepSeek的ClientConfig"""
+        return ClientConfig(
+            api_key=llm_config.api_key,
+            base_url=llm_config.base_url or "https://api.deepseek.com",
+            model=llm_config.model_name,
+            timeout=llm_config.timeout,
+            max_retries=llm_config.max_retries,
+            retry_delay_base=llm_config.retry_delay_base,
+            temperature=llm_config.temperature,
+            max_tokens=llm_config.max_tokens,
+            enable_cache=llm_config.enable_cache,
+            cache_ttl=llm_config.cache_ttl,
+            proxies=llm_config.proxies,
+            request_interval=llm_config.request_interval
+        )
+    
+    def chat_completion(self, 
+                       messages: Union[str, List[LLMMessage]], 
+                       temperature: Optional[float] = None,
+                       max_tokens: Optional[int] = None,
+                       **kwargs) -> LLMResponse:
         """
-        聊天完成API调用
+        聊天完成API调用 - 统一接口实现
         
         Args:
-            messages: 消息列表
+            messages: 消息内容，可以是字符串或消息列表
             temperature: 温度参数
             max_tokens: 最大token数
-            model: 模型名称
-            system_message: 系统消息（会自动添加到messages开头）
-            enable_cache: 是否启用缓存
+            **kwargs: 其他参数
             
         Returns:
-            API响应对象
+            LLMResponse: 统一的响应对象
         """
         start_time = time.time()
+        
+        # 准备消息格式
+        prepared_messages = self._prepare_messages(messages)
         
         # 参数处理
         temperature = temperature or self.config.temperature
         max_tokens = max_tokens or self.config.max_tokens
-        model = model or self.config.model
-        enable_cache = enable_cache if enable_cache is not None else self.config.enable_cache
+        model = kwargs.get('model') or self.config.model
+        enable_cache = kwargs.get('enable_cache', self.config.enable_cache)
         
-        # 添加系统消息
-        if system_message:
-            messages = [{"role": "system", "content": system_message}] + messages
+        # 转换为DeepSeek API格式
+        api_messages = []
+        for msg in prepared_messages:
+            api_messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
         
         # 构建请求数据
         request_data = {
             'model': model,
-            'messages': messages,
+            'messages': api_messages,
             'temperature': temperature,
             'max_tokens': max_tokens
         }
@@ -192,24 +261,34 @@ class DeepSeekClient:
         # 检查缓存
         cache_key = self._generate_cache_key(request_data)
         if enable_cache and self._is_cache_valid(cache_key):
-            cached_response, _ = self._cache[cache_key]
+            cached_api_response, _ = self._cache[cache_key]
             self.metrics.cache_hits += 1
             logger.debug(f"📋 使用缓存响应: {cache_key[:16]}...")
-            return cached_response
+            
+            # 转换为统一格式
+            llm_response = cached_api_response.to_llm_response("deepseek")
+            self._update_stats(llm_response)
+            return llm_response
         
         # 执行API调用
-        response = self._execute_request(request_data, start_time)
+        api_response = self._execute_request(request_data, start_time)
+        
+        # 转换为统一格式
+        llm_response = api_response.to_llm_response("deepseek")
         
         # 更新缓存
-        if enable_cache and response.success:
-            self._cache[cache_key] = (response, time.time())
+        if enable_cache and api_response.success:
+            self._cache[cache_key] = (api_response, time.time())
             self._cleanup_cache()
         
         # 更新指标
         if self.config.enable_metrics:
-            self._update_metrics(response)
+            self._update_metrics(api_response)
         
-        return response
+        # 更新父类统计
+        self._update_stats(llm_response)
+        
+        return llm_response
     
     def simple_chat(
         self,
@@ -292,7 +371,7 @@ class DeepSeekClient:
                 response_time = time.time() - start_time
                 last_error = APIResponse(
                     success=False,
-                    error_type=APIErrorType.TIMEOUT_ERROR,
+                    error_type=LLMErrorType.TIMEOUT_ERROR,
                     error_message=f"请求超时: {str(e)}",
                     response_time=response_time
                 )
@@ -320,7 +399,7 @@ class DeepSeekClient:
                 response_time = time.time() - start_time
                 last_error = APIResponse(
                     success=False,
-                    error_type=APIErrorType.UNKNOWN_ERROR,
+                    error_type=LLMErrorType.UNKNOWN_ERROR,
                     error_message=f"未知错误: {str(e)}",
                     response_time=response_time
                 )
@@ -364,7 +443,7 @@ class DeepSeekClient:
             logger.error(f"❌ 响应解析失败: {str(e)}")
             return APIResponse(
                 success=False,
-                error_type=APIErrorType.PARSE_ERROR,
+                error_type=LLMErrorType.PARSE_ERROR,
                 error_message=f"响应解析失败: {str(e)}",
                 status_code=response.status_code,
                 response_time=response_time
@@ -372,19 +451,22 @@ class DeepSeekClient:
     
     def _process_error_response(self, response: requests.Response, response_time: float) -> APIResponse:
         """处理错误响应"""
-        error_type = APIErrorType.UNKNOWN_ERROR
+        error_type = LLMErrorType.UNKNOWN_ERROR
         error_message = f"HTTP {response.status_code}"
         
         # 根据状态码分类错误
         if response.status_code == 401:
-            error_type = APIErrorType.AUTHENTICATION
+            error_type = LLMErrorType.AUTHENTICATION
             error_message = "API密钥认证失败"
         elif response.status_code == 429:
-            error_type = APIErrorType.RATE_LIMIT
+            error_type = LLMErrorType.RATE_LIMIT
             error_message = "API调用频率限制"
         elif response.status_code in [500, 502, 503, 504]:
-            error_type = APIErrorType.SERVER_ERROR
+            error_type = LLMErrorType.SERVER_ERROR
             error_message = f"服务器错误 {response.status_code}"
+        elif response.status_code == 400:
+            error_type = LLMErrorType.INVALID_REQUEST
+            error_message = "请求参数无效"
         
         # 尝试提取详细错误信息
         try:
@@ -404,27 +486,28 @@ class DeepSeekClient:
             response_time=response_time
         )
     
-    def _should_retry(self, error_type: APIErrorType, attempt: int) -> bool:
+    def _should_retry(self, error_type: LLMErrorType, attempt: int) -> bool:
         """判断是否应该重试"""
         if attempt >= self.config.max_retries - 1:
             return False
         
         # 不重试的错误类型
         non_retryable = {
-            APIErrorType.AUTHENTICATION,
-            APIErrorType.PARSE_ERROR
+            LLMErrorType.AUTHENTICATION,
+            LLMErrorType.PARSE_ERROR,
+            LLMErrorType.INVALID_REQUEST
         }
         
         return error_type not in non_retryable
     
-    def _calculate_retry_delay(self, error_type: APIErrorType, attempt: int) -> float:
+    def _calculate_retry_delay(self, error_type: LLMErrorType, attempt: int) -> float:
         """计算重试延迟时间"""
         base_delay = self.config.retry_delay_base
         
-        if error_type == APIErrorType.RATE_LIMIT:
+        if error_type == LLMErrorType.RATE_LIMIT:
             # 限流错误使用指数退避
             return base_delay ** (attempt + 1) * 2
-        elif error_type == APIErrorType.SERVER_ERROR:
+        elif error_type == LLMErrorType.SERVER_ERROR:
             # 服务器错误使用线性增长
             return 5 * (attempt + 1)
         else:
@@ -503,12 +586,62 @@ class DeepSeekClient:
         """清理资源"""
         self.session.close()
         logger.debug("🔄 DeepSeekClient 资源已清理")
+    
+    # ==================== 实现BaseLLMClient抽象方法 ====================
+    
+    def validate_config(self) -> bool:
+        """
+        验证配置是否有效
+        
+        Returns:
+            bool: 配置是否有效
+        """
+        try:
+            if not self.config.api_key:
+                return False
+            
+            # 简单测试API连通性
+            test_response = self.simple_chat("test", system_message="Reply with 'ok'")
+            return test_response.success
+            
+        except Exception as e:
+            logger.error(f"❌ DeepSeek配置验证失败: {e}")
+            return False
+    
+    def get_available_models(self) -> List[str]:
+        """
+        获取可用模型列表
+        
+        Returns:
+            List[str]: 可用的模型名称列表
+        """
+        # DeepSeek目前支持的模型
+        return [
+            "deepseek-chat",
+            "deepseek-coder"
+        ]
+    
+    def get_supported_features(self) -> List[str]:
+        """
+        获取支持的功能列表
+        
+        Returns:
+            List[str]: 支持的功能
+        """
+        return [
+            "chat_completion", 
+            "text_generation", 
+            "chinese_language",
+            "coding_assistance",
+            "caching",
+            "retry_mechanism"
+        ]
 
 
 # 工厂函数和便捷接口
 def create_client(api_key: str, **kwargs) -> DeepSeekClient:
     """
-    创建 DeepSeek 客户端的工厂函数
+    创建 DeepSeek 客户端的工厂函数 - 向后兼容
     
     Args:
         api_key: API密钥
@@ -519,6 +652,26 @@ def create_client(api_key: str, **kwargs) -> DeepSeekClient:
     """
     config = ClientConfig(api_key=api_key, **kwargs)
     return DeepSeekClient(config)
+
+
+def create_llm_client(api_key: str, **kwargs) -> DeepSeekClient:
+    """
+    创建统一LLM客户端的工厂函数
+    
+    Args:
+        api_key: API密钥
+        **kwargs: 其他配置参数
+        
+    Returns:
+        DeepSeekClient 实例（实现BaseLLMClient接口）
+    """
+    llm_config = LLMConfig(
+        provider=LLMProvider.DEEPSEEK,
+        api_key=api_key,
+        model_name=kwargs.pop('model_name', 'deepseek-chat'),
+        **kwargs
+    )
+    return DeepSeekClient(llm_config)
 
 
 def quick_chat(api_key: str, prompt: str, system_message: Optional[str] = None) -> str:
