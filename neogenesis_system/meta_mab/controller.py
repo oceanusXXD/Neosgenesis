@@ -34,38 +34,48 @@ class MainController:
         self.api_key = api_key
         self.config = config
         
-        # 🏗️ 依赖注入重构：在顶层创建所有共享客户端
-        # 创建共享的LLM客户端
-        self.llm_client = None
+        # 🏗️ 多LLM支持：使用统一的LLM管理器
+        from .llm_manager import LLMManager
         
-        # 🔍 详细的API密钥检测和调试信息
-        logger.info(f"🔧 正在初始化LLM客户端...")
-        logger.info(f"   API密钥状态: {'已提供' if api_key else '未提供'}")
-        if api_key:
-            logger.info(f"   API密钥长度: {len(api_key)}")
-            logger.info(f"   API密钥前缀: {api_key[:10]}..." if len(api_key) > 10 else f"   API密钥: {api_key}")
-            logger.info(f"   API密钥格式检查: {'✅ 正确' if api_key.startswith(('sk-', 'deepseek-')) else '⚠️ 可能不正确'}")
+        logger.info(f"🔧 正在初始化LLM管理器...")
         
-        # 改进的API密钥检测逻辑
+        # 如果提供了API密钥，设置环境变量（向后兼容）
         if api_key and api_key.strip():
-            from .utils.client_adapter import DeepSeekClientAdapter
+            import os
+            os.environ.setdefault("DEEPSEEK_API_KEY", api_key.strip())
+            logger.info(f"🔑 API密钥已设置为DEEPSEEK_API_KEY环境变量")
+        
+        # 创建LLM管理器
+        try:
+            self.llm_manager = LLMManager()
+            self.llm_client = self.llm_manager  # 向后兼容
+            
+            status = self.llm_manager.get_provider_status()
+            logger.info("🧠 LLM管理器初始化完成")
+            logger.info(f"   总提供商: {status['total_providers']}")
+            logger.info(f"   健康提供商: {status['healthy_providers']}")
+            logger.info(f"   初始化状态: {'✅' if status['initialized'] else '❌'}")
+            
+        except Exception as e:
+            logger.error(f"❌ LLM管理器初始化失败: {e}")
+            import traceback
+            logger.error(f"   详细堆栈: {traceback.format_exc()}")
+            
+            # 回退到单一客户端模式
+            logger.warning("🔄 回退到单一DeepSeek客户端模式")
+            self.llm_manager = None
+            self.llm_client = self._create_fallback_client(api_key)
+    
+    def _create_fallback_client(self, api_key: str):
+        """创建回退客户端"""
+        if api_key and api_key.strip():
             try:
-                logger.info("🚀 开始创建DeepSeekClientAdapter...")
-                self.llm_client = DeepSeekClientAdapter(api_key.strip())
-                logger.info("🧠 共享LLM客户端已创建 (DeepSeek)")
-                logger.info(f"   客户端类型: {type(self.llm_client).__name__}")
-                logger.info(f"   客户端状态: {'✅ 就绪' if self.llm_client else '❌ 创建失败'}")
+                from .utils.client_adapter import DeepSeekClientAdapter
+                return DeepSeekClientAdapter(api_key.strip())
             except Exception as e:
-                logger.error(f"❌ LLM客户端创建失败:")
-                logger.error(f"   错误类型: {type(e).__name__}")
-                logger.error(f"   错误信息: {str(e)}")
-                logger.error(f"   API密钥检查: {api_key[:10]}..." if api_key else "None")
-                import traceback
-                logger.error(f"   详细堆栈: {traceback.format_exc()}")
-                self.llm_client = None
-        else:
-            logger.warning("⚠️ 未提供有效的API密钥，LLM功能将不可用")
-            logger.warning("   💡 提示: 请设置DEEPSEEK_API_KEY环境变量或传递api_key参数")
+                logger.error(f"❌ 回退客户端创建失败: {e}")
+                return None
+        return None
         
         # 创建共享的搜索客户端
         self.web_search_client = WebSearchClient(search_engine="duckduckgo", max_results=5)
@@ -119,9 +129,22 @@ class MainController:
         
 
             
-        logger.info("🚀 MainController初始化完成 - 使用组件化架构")
+        logger.info("🚀 MainController初始化完成 - 使用多LLM支持的组件化架构")
         logger.info(f"🔍 研究员工具已装备: {'✅' if self.web_search_client else '❌'} 搜索引擎")
-        logger.info(f"🧠 LLM分析工具已装备: {'✅' if self.llm_client else '❌'} DeepSeek客户端")
+        
+        # 显示LLM系统状态
+        if self.llm_manager:
+            status = self.llm_manager.get_provider_status()
+            logger.info(f"🧠 LLM系统已装备: ✅ 管理器模式")
+            logger.info(f"   可用提供商: {status['healthy_providers']}/{status['total_providers']}")
+            
+            # 显示主要提供商
+            if status['providers']:
+                healthy_providers = [name for name, info in status['providers'].items() if info['healthy']]
+                if healthy_providers:
+                    logger.info(f"   活跃提供商: {', '.join(healthy_providers)}")
+        else:
+            logger.info(f"🧠 LLM系统已装备: {'✅' if self.llm_client else '❌'} 回退模式")
     
     def make_decision(self, user_query: str, deepseek_confidence: float = 0.5, 
                      execution_context: Optional[Dict] = None) -> Dict[str, Any]:
@@ -1836,6 +1859,100 @@ class MainController:
         ]
         
         return emergency_paths
+    
+    # ==================== 多LLM管理方法 ====================
+    
+    def switch_llm_provider(self, provider_name: str) -> bool:
+        """
+        切换LLM提供商
+        
+        Args:
+            provider_name: 提供商名称
+            
+        Returns:
+            bool: 是否切换成功
+        """
+        if not self.llm_manager:
+            logger.warning("⚠️ LLM管理器未初始化，无法切换提供商")
+            return False
+        
+        success = self.llm_manager.switch_primary_provider(provider_name)
+        if success:
+            logger.info(f"🔄 已切换到LLM提供商: {provider_name}")
+        else:
+            logger.error(f"❌ 切换LLM提供商失败: {provider_name}")
+        
+        return success
+    
+    def get_llm_provider_status(self) -> Dict[str, Any]:
+        """
+        获取LLM提供商状态
+        
+        Returns:
+            Dict[str, Any]: 提供商状态信息
+        """
+        if not self.llm_manager:
+            return {
+                'initialized': False,
+                'error': 'LLM管理器未初始化',
+                'fallback_mode': True,
+                'available_providers': []
+            }
+        
+        return self.llm_manager.get_provider_status()
+    
+    def get_available_llm_models(self, provider_name: Optional[str] = None) -> Dict[str, List[str]]:
+        """
+        获取可用的LLM模型
+        
+        Args:
+            provider_name: 提供商名称（可选）
+            
+        Returns:
+            Dict[str, List[str]]: 提供商和对应的模型列表
+        """
+        if not self.llm_manager:
+            return {"error": "LLM管理器未初始化"}
+        
+        return self.llm_manager.get_available_models(provider_name)
+    
+    def run_llm_health_check(self, force: bool = False) -> Dict[str, bool]:
+        """
+        运行LLM提供商健康检查
+        
+        Args:
+            force: 是否强制检查
+            
+        Returns:
+            Dict[str, bool]: 各提供商的健康状态
+        """
+        if not self.llm_manager:
+            return {"error": "LLM管理器未初始化"}
+        
+        return self.llm_manager.health_check(force)
+    
+    def get_llm_cost_summary(self) -> Dict[str, Any]:
+        """
+        获取LLM使用成本总结
+        
+        Returns:
+            Dict[str, Any]: 成本总结信息
+        """
+        if not self.llm_manager:
+            return {"error": "LLM管理器未初始化"}
+        
+        status = self.llm_manager.get_provider_status()
+        cost_data = status.get('stats', {}).get('cost_tracking', {})
+        
+        total_cost = sum(cost_data.values())
+        
+        return {
+            'total_cost_usd': total_cost,
+            'cost_by_provider': dict(cost_data),
+            'total_requests': status.get('stats', {}).get('total_requests', 0),
+            'successful_requests': status.get('stats', {}).get('successful_requests', 0),
+            'fallback_count': status.get('stats', {}).get('fallback_count', 0)
+        }
     
     def _create_conservative_emergency_path(self, user_query: str):
         """创建保守的应急路径"""
