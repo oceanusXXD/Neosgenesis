@@ -3,7 +3,7 @@
 
 """
 Neogenesis System - 智能决策系统
-A modular intelligent decision-making system powered by DeepSeek and MAB algorithms
+A modular intelligent decision-making system powered by LLMs and MAB algorithms
 
 主要组件:
 - MainController: 主控制器，协调所有组件
@@ -19,7 +19,7 @@ __email__ = "team@neogenesis.ai"
 # 导入核心组件
 from .meta_mab.controller import MainController
 from .meta_mab.reasoner import PriorReasoner
-from .meta_mab.path_generator import PathGenerator, DeepSeekDrivenDimensionCreator
+from .meta_mab.path_generator import PathGenerator, LLMDrivenDimensionCreator
 from .meta_mab.mab_converger import MABConverger
 
 # 导入数据结构
@@ -54,7 +54,7 @@ __all__ = [
     "MainController",
     "PriorReasoner", 
     "PathGenerator",
-    "DeepSeekDrivenDimensionCreator",
+    "LLMDrivenDimensionCreator",
     "MABConverger",
     
         # 数据结构
@@ -111,7 +111,7 @@ def get_system_info() -> dict:
     return {
         "name": "Neogenesis System",
         "version": __version__,
-        "description": "智能决策系统 - DeepSeek驱动的多臂老虎机决策框架",
+        "description": "智能决策系统 - LLM驱动的多臂老虎机决策框架",
         "author": __author__,
         "components": [
             "MainController",
@@ -124,6 +124,6 @@ def get_system_info() -> dict:
             "多臂老虎机算法优化",
             "强化学习反馈机制",
             "组件化架构设计",
-            "DeepSeek智能推理集成"
+            "多LLM智能推理集成"
         ]
     }
