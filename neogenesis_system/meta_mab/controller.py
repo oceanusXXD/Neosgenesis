@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -16,9 +15,28 @@ from .reasoner import PriorReasoner
 from .path_generator import PathGenerator
 from .mab_converger import MABConverger
 from .data_structures import DecisionResult, SystemStatus
-from .utils.search_client import WebSearchClient, IdeaVerificationSearchClient, SearchResponse
+# 🗑️ 已移除：不再直接导入搜索客户端，所有搜索功能通过ToolRegistry进行
+# from .utils.search_client import WebSearchClient, IdeaVerificationSearchClient, SearchResponse
 from .utils.performance_optimizer import PerformanceOptimizer
 from .utils.shutdown_manager import shutdown_neogenesis_system, register_for_shutdown
+
+# 🔧 新增：导入统一工具抽象接口
+from .utils.tool_abstraction import (
+    ToolRegistry, 
+    global_tool_registry,
+    register_tool,
+    get_tool,
+    execute_tool,
+    search_tools,
+    ToolCategory,
+    ToolResult
+)
+from .utils.search_tools import (
+    WebSearchTool,
+    IdeaVerificationTool,
+    create_and_register_search_tools
+)
+
 from config import SYSTEM_LIMITS, FEATURE_FLAGS, PROMPT_TEMPLATES, PERFORMANCE_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -65,6 +83,14 @@ class MainController:
             logger.warning("🔄 回退到单一DeepSeek客户端模式")
             self.llm_manager = None
             self.llm_client = self._create_fallback_client(api_key)
+        
+        # 🔧 初始化工具注册表系统
+        self._initialize_tool_registry()
+        
+        # 🗑️ 已移除：不再需要直接的搜索客户端，所有搜索功能通过ToolRegistry进行
+        
+        # 完成剩余的初始化工作
+        self._complete_initialization()
     
     def _create_fallback_client(self, api_key: str):
         """创建回退客户端"""
@@ -76,14 +102,257 @@ class MainController:
                 logger.error(f"❌ 回退客户端创建失败: {e}")
                 return None
         return None
+    
+    def _initialize_tool_registry(self):
+        """初始化工具注册表系统"""
+        try:
+            # 使用全局工具注册表
+            self.tool_registry = global_tool_registry
+            
+            # 创建并注册搜索工具
+            tools = create_and_register_search_tools()
+            
+            logger.info(f"🔧 工具注册表初始化完成，已注册 {len(tools)} 个工具")
+            for tool_name in tools:
+                logger.debug(f"   - {tool_name}")
+                
+        except Exception as e:
+            logger.error(f"❌ 工具注册表初始化失败: {e}")
+            self.tool_registry = None
+    
+    def _execute_llm_with_tools(self, prompt: str, context: Optional[Dict] = None, 
+                               available_tools: Optional[List[str]] = None,
+                               max_tool_calls: int = 3) -> Dict[str, Any]:
+        """
+        增强的LLM执行方法 - 支持工具调用
         
-        # 创建共享的搜索客户端
-        self.web_search_client = WebSearchClient(search_engine="duckduckgo", max_results=5)
-        self.idea_verification_client = IdeaVerificationSearchClient(self.web_search_client)
+        这个方法允许LLM在推理过程中智能地调用工具来获取信息或执行操作。
+        工具调用结果会被融入到LLM的思考过程中，实现真正的工具增强推理。
         
+        Args:
+            prompt: LLM提示词
+            context: 上下文信息 
+            available_tools: 可用工具列表（如果为None，则使用所有已注册工具）
+            max_tool_calls: 最大工具调用次数
+            
+        Returns:
+            包含LLM响应和工具调用结果的字典
+        """
+        start_time = time.time()
+        
+        # 准备工具信息
+        tool_descriptions = self._prepare_tool_descriptions(available_tools)
+        
+        # 构建增强的提示词
+        enhanced_prompt = self._build_tool_enhanced_prompt(prompt, tool_descriptions, context)
+        
+        # 执行结果
+        result = {
+            'llm_response': '',
+            'tool_calls': [],
+            'tool_results': {},
+            'execution_time': 0.0,
+            'success': True,
+            'error_message': '',
+            'context_updates': {}
+        }
+        
+        try:
+            # 初始LLM调用
+            logger.debug(f"🧠 执行工具增强LLM推理，最大工具调用: {max_tool_calls}")
+            
+            if self.llm_manager:
+                llm_result = self.llm_manager.chat_completion(enhanced_prompt)
+                if llm_result.success:
+                    llm_response = llm_result.content
+                else:
+                    raise Exception(f"LLM调用失败: {llm_result.error_message}")
+            elif self.llm_client:
+                llm_response = self.llm_client.call_api(enhanced_prompt)
+            else:
+                raise Exception("没有可用的LLM客户端")
+            
+            result['llm_response'] = llm_response
+            
+            # 解析并执行工具调用
+            tool_calls_made = 0
+            current_response = llm_response
+            
+            while tool_calls_made < max_tool_calls:
+                # 检测工具调用意图
+                tool_call_request = self._detect_tool_call_intent(current_response)
+                
+                if not tool_call_request:
+                    break
+                
+                # 执行工具调用
+                tool_result = self._execute_detected_tool_call(tool_call_request)
+                
+                if tool_result:
+                    result['tool_calls'].append(tool_call_request)
+                    result['tool_results'][tool_call_request['tool_name']] = tool_result
+                    
+                    # 将工具结果融入到下一次LLM调用中
+                    followup_prompt = self._build_tool_followup_prompt(
+                        original_prompt=prompt,
+                        previous_response=current_response,
+                        tool_call=tool_call_request,
+                        tool_result=tool_result
+                    )
+                    
+                    # 下一次LLM调用
+                    if self.llm_manager:
+                        llm_result = self.llm_manager.chat_completion(followup_prompt)
+                        if llm_result.success:
+                            current_response = llm_result.content
+                        else:
+                            raise Exception(f"LLM调用失败: {llm_result.error_message}")
+                    elif self.llm_client:
+                        current_response = self.llm_client.call_api(followup_prompt)
+                    
+                    result['llm_response'] = current_response  # 更新最终响应
+                    tool_calls_made += 1
+                    
+                    logger.debug(f"🔧 工具调用 {tool_calls_made}: {tool_call_request['tool_name']}")
+                else:
+                    break
+            
+            result['execution_time'] = time.time() - start_time
+            logger.debug(f"✅ 工具增强LLM执行完成，调用了 {tool_calls_made} 个工具")
+            
+        except Exception as e:
+            result['success'] = False
+            result['error_message'] = str(e)
+            result['execution_time'] = time.time() - start_time
+            logger.error(f"❌ 工具增强LLM执行失败: {e}")
+        
+        return result
+    
+    def _prepare_tool_descriptions(self, available_tools: Optional[List[str]] = None) -> str:
+        """准备工具描述信息"""
+        if not self.tool_registry:
+            return "当前没有可用工具。"
+        
+        if available_tools:
+            # 使用指定的工具列表
+            tool_list = []
+            for tool_name in available_tools:
+                tool = get_tool(tool_name)
+                if tool:
+                    tool_list.append(f"- {tool.name}: {tool.description}")
+        else:
+            # 使用所有已注册工具
+            all_tools = [tool for tool in self.tool_registry]
+            tool_list = [f"- {tool.name}: {tool.description}" for tool in all_tools]
+        
+        if not tool_list:
+            return "当前没有可用工具。"
+        
+        return "可用工具:\n" + "\n".join(tool_list)
+    
+    def _build_tool_enhanced_prompt(self, original_prompt: str, tool_descriptions: str, 
+                                   context: Optional[Dict] = None) -> str:
+        """构建工具增强的提示词"""
+        enhanced_prompt = f"""
+你是一个智能AI助手，具有使用工具的能力。在回答问题时，你可以调用以下工具来获取信息或执行操作：
+
+{tool_descriptions}
+
+调用工具的格式：
+**TOOL_CALL**: [工具名称] | [调用参数]
+
+例如：
+**TOOL_CALL**: web_search | Python编程最佳实践
+
+请根据以下任务思考是否需要使用工具，如果需要，请按照上述格式调用工具：
+
+{original_prompt}
+
+如果你需要调用工具，请在回答中明确表明，并使用正确的格式。如果不需要工具，请直接回答问题。
+"""
+        
+        if context:
+            enhanced_prompt += f"\n\n上下文信息：{context}"
+        
+        return enhanced_prompt
+    
+    def _detect_tool_call_intent(self, response: str) -> Optional[Dict[str, Any]]:
+        """检测LLM响应中的工具调用意图"""
+        import re
+        
+        # 查找工具调用模式
+        pattern = r'\*\*TOOL_CALL\*\*:\s*([^\|]+)\|\s*(.+)'
+        match = re.search(pattern, response)
+        
+        if match:
+            tool_name = match.group(1).strip()
+            tool_params = match.group(2).strip()
+            
+            return {
+                'tool_name': tool_name,
+                'tool_params': tool_params,
+                'raw_call': match.group(0)
+            }
+        
+        return None
+    
+    def _execute_detected_tool_call(self, tool_call_request: Dict[str, Any]) -> Optional[ToolResult]:
+        """执行检测到的工具调用"""
+        try:
+            tool_name = tool_call_request['tool_name']
+            tool_params = tool_call_request['tool_params']
+            
+            # 通过工具注册表执行工具
+            result = execute_tool(tool_name, tool_params)
+            
+            if result and result.success:
+                logger.debug(f"✅ 工具 {tool_name} 执行成功")
+                return result
+            else:
+                logger.warning(f"⚠️ 工具 {tool_name} 执行失败: {result.error_message if result else '未知错误'}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ 工具调用异常: {e}")
+            return None
+    
+    def _build_tool_followup_prompt(self, original_prompt: str, previous_response: str,
+                                   tool_call: Dict[str, Any], tool_result: ToolResult) -> str:
+        """构建工具调用后的跟进提示词"""
+        
+        tool_result_summary = ""
+        if tool_result.success and tool_result.data:
+            # 根据工具类型格式化结果
+            if isinstance(tool_result.data, dict) and 'results' in tool_result.data:
+                # 搜索结果格式化
+                results = tool_result.data['results'][:3]  # 只取前3个结果
+                tool_result_summary = f"搜索到 {len(results)} 个相关结果：\n"
+                for i, item in enumerate(results, 1):
+                    tool_result_summary += f"{i}. {item.get('title', '无标题')}\n   {item.get('snippet', '无摘要')[:100]}...\n"
+            else:
+                tool_result_summary = str(tool_result.data)[:500] + "..."
+        else:
+            tool_result_summary = f"工具调用失败: {tool_result.error_message}"
+        
+        followup_prompt = f"""
+原始任务: {original_prompt}
+
+你刚才调用了工具: {tool_call['tool_name']}
+工具调用参数: {tool_call['tool_params']}
+
+工具返回的结果:
+{tool_result_summary}
+
+请基于这些工具获取的信息，继续完成原始任务。如果还需要调用其他工具，请继续使用 **TOOL_CALL** 格式。否则，请提供最终答案。
+"""
+        
+        return followup_prompt
+    
+    def _complete_initialization(self):
+        """完成剩余的初始化工作"""
         # 🔧 初始化各个组件 - 注入共享依赖
-        self.prior_reasoner = PriorReasoner(api_key)  # 轻量级，不需要LLM客户端
-        self.path_generator = PathGenerator(api_key, llm_client=self.llm_client)  # 注入LLM客户端
+        self.prior_reasoner = PriorReasoner(self.api_key)  # 轻量级，不需要LLM客户端
+        self.path_generator = PathGenerator(self.api_key, llm_client=self.llm_client)  # 注入LLM客户端
         self.mab_converger = MABConverger()
         
         # 🚀 新增：性能优化器
@@ -127,10 +396,14 @@ class MainController:
             'aha_decision_history': []         # Aha-Moment决策历史
         }
         
-
-            
-        logger.info("🚀 MainController初始化完成 - 使用多LLM支持的组件化架构")
-        logger.info(f"🔍 研究员工具已装备: {'✅' if self.web_search_client else '❌'} 搜索引擎")
+        logger.info("🚀 MainController初始化完成 - 使用工具增强的五阶段决策系统")
+        logger.info(f"🔧 工具注册表已装备: {'✅' if self.tool_registry else '❌'} 统一工具接口")
+        
+        # 显示已注册工具
+        if self.tool_registry:
+            from .utils.tool_abstraction import list_available_tools
+            tools = list_available_tools()
+            logger.info(f"🔍 已注册工具: {len(tools)} 个 ({', '.join(tools)})")
         
         # 显示LLM系统状态
         if self.llm_manager:
@@ -1188,10 +1461,7 @@ class MainController:
         
         logger.info("✅ 系统重置完成")
         
-        # 重置验证相关缓存
-        if hasattr(self, 'idea_verification_client') and self.idea_verification_client:
-            self.idea_verification_client.verification_cache.clear()
-            logger.info("🧹 已清除验证缓存")
+        # 🗑️ 已移除：不再需要清理验证客户端缓存，工具缓存由ToolRegistry管理
     
     # ================================
     # 🔬 新增：想法验证研究员能力
@@ -1199,89 +1469,266 @@ class MainController:
     
     def verify_idea_feasibility(self, idea_text: str, context: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        想法验证流程 - MainController的新"研究员"能力
+        🔧 工具增强的想法验证流程 - 从硬编码搜索升级为灵活工具调用
         
-        这个方法实现了完整的"搜索并判断可行性"工作流：
-        1. 接收想法：接收需要验证的想法文本
-        2. 构思问题：转换成搜索查询
-        3. 执行搜索：获取相关资料
-        4. 请求分析：LLM分析可行性
-        5. 量化结果：计算奖惩分数
+        原有方法本质上是一个硬编码的"搜索工具"调用。现在升级为：
+        1. 智能工具选择：根据验证需求选择最合适的工具
+        2. 工具增强推理：LLM可以调用多个工具获取信息
+        3. 动态验证策略：根据想法类型采用不同验证方法
+        4. 学习反馈机制：工具使用结果影响MAB学习
         
         Args:
             idea_text: 需要验证的想法文本（思维种子或思维路径描述）
             context: 上下文信息
             
         Returns:
-            验证结果字典
+            增强的验证结果字典
         """
         start_time = time.time()
         logger.info(f"🔬 开始想法验证研究: {idea_text[:50]}...")
         
         try:
-            # 第1步：接收想法 - 预处理和清理
-            cleaned_idea = self._preprocess_idea_text(idea_text)
-            logger.debug(f"📝 想法清理完成: {len(cleaned_idea)}字符")
+            # 🔧 使用工具增强的验证流程（无回退机制）
+            verification_result = self._enhanced_verification_with_tools(idea_text, context)
             
-            # 第2步：构思问题 - 转换成搜索查询
-            search_query = self._generate_verification_query(cleaned_idea, context)
-            logger.info(f"🤔 构思搜索问题: {search_query}")
+            # 如果工具增强验证失败，直接返回失败结果
+            if not verification_result.get('success', False):
+                logger.error("❌ 工具增强验证失败，无回退机制")
+                execution_time = time.time() - start_time
+                return self._create_direct_failure_result(
+                    idea_text, 
+                    verification_result.get('error_message', '工具增强验证失败'), 
+                    execution_time
+                )
             
-            # 第3步：执行搜索 - 获取外部资料
-            search_start = time.time()
-            search_response = self.idea_verification_client.search_for_idea_verification(
-                cleaned_idea, context
-            )
-            search_time = time.time() - search_start
+            # 统计和学习反馈
+            execution_time = time.time() - start_time
+            self._update_verification_stats(verification_result, execution_time)
             
-            if not search_response.success:
-                logger.warning(f"⚠️ 搜索失败: {search_response.error_message}")
-                return self._create_fallback_verification_result(idea_text, "搜索失败")
-            
-            logger.info(f"🔍 搜索完成: 找到{len(search_response.results)}个结果，耗时{search_time:.2f}秒")
-            
-            # 第4步：请求分析 - LLM分析可行性
-            analysis_start = time.time()
-            feasibility_analysis = self._analyze_idea_feasibility(
-                cleaned_idea, search_response, context
-            )
-            analysis_time = time.time() - analysis_start
-            
-            logger.info(f"🧠 LLM分析完成: 耗时{analysis_time:.2f}秒")
-            
-            # 第5步：量化结果 - 计算奖惩分数
-            reward_score = self._calculate_verification_reward(feasibility_analysis)
-            
-            # 构建完整结果
-            verification_result = {
-                'idea_text': idea_text,
-                'cleaned_idea': cleaned_idea,
-                'search_query': search_query,
-                'search_results': search_response.results,
-                'search_stats': {
-                    'total_results': search_response.total_results,
-                    'search_time': search_time,
-                    'success': search_response.success
-                },
-                'feasibility_analysis': feasibility_analysis,
-                'reward_score': reward_score,
-                'verification_time': time.time() - start_time,
-                'timestamp': time.time()
-            }
-            
-            # 更新性能统计
-            self._update_verification_performance(verification_result)
-            
-            logger.info(f"✅ 想法验证完成: 奖励分数={reward_score:.3f}")
+            logger.info(f"✅ 想法验证完成: 可行性={verification_result.get('feasibility_analysis', {}).get('feasibility_score', 0):.2f}")
             return verification_result
             
         except Exception as e:
-            error_time = time.time() - start_time
-            logger.error(f"❌ 想法验证失败: {e}")
-            
-            return self._create_fallback_verification_result(
-                idea_text, f"验证过程异常: {str(e)}", error_time
+            logger.error(f"❌ 想法验证异常: {e}")
+            execution_time = time.time() - start_time
+            return self._create_direct_failure_result(
+                idea_text, f"验证异常: {e}", execution_time
             )
+    
+    def _enhanced_verification_with_tools(self, idea_text: str, context: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        🔧 工具增强的验证方法 - 核心升级
+        
+        这个方法展示了如何将原有的硬编码搜索改造为灵活的工具调用：
+        1. 智能工具选择：根据想法类型选择最合适的验证工具
+        2. 多步骤验证：可以连续使用多个工具
+        3. 上下文感知：根据验证阶段调整工具使用策略
+        """
+        try:
+            # 构建验证提示词
+            verification_prompt = self._build_verification_prompt(idea_text, context)
+            
+            # 选择适合验证的工具
+            available_tools = self._select_verification_tools(idea_text, context)
+            
+            # 使用工具增强的LLM推理
+            llm_result = self._execute_llm_with_tools(
+                prompt=verification_prompt,
+                context=context,
+                available_tools=available_tools,
+                max_tool_calls=2  # 验证阶段限制工具调用次数
+            )
+            
+            if not llm_result['success']:
+                return {'success': False, 'error_message': llm_result['error_message']}
+            
+            # 解析LLM的验证结果
+            verification_analysis = self._parse_verification_response(llm_result['llm_response'])
+            
+            # 计算奖励分数（考虑工具使用效果）
+            reward_score = self._calculate_enhanced_reward(verification_analysis, llm_result['tool_calls'])
+            
+            return {
+                'success': True,
+                'idea_text': idea_text,
+                'feasibility_analysis': verification_analysis,
+                'reward_score': reward_score,
+                'tool_calls_made': len(llm_result['tool_calls']),
+                'tool_results': llm_result['tool_results'],
+                'execution_time': llm_result['execution_time'],
+                'verification_method': 'tool_enhanced'
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ 工具增强验证失败: {e}")
+            return {'success': False, 'error_message': str(e)}
+    
+    def _build_verification_prompt(self, idea_text: str, context: Optional[Dict] = None) -> str:
+        """构建验证提示词"""
+        stage = context.get('stage', 'unknown') if context else 'unknown'
+        
+        prompt = f"""
+请分析以下想法的可行性，并提供详细的评估报告。你可以使用搜索工具来获取相关信息：
+
+想法内容：{idea_text}
+
+分析阶段：{stage}
+"""
+        
+        if context:
+            if 'query' in context:
+                prompt += f"\n原始查询：{context['query']}"
+            if 'domain' in context:
+                prompt += f"\n应用领域：{context['domain']}"
+        
+        prompt += """
+
+请从以下角度进行分析：
+1. 技术可行性 - 从技术角度评估实现难度
+2. 市场需求 - 分析是否有实际需求
+3. 资源要求 - 评估所需资源和成本
+4. 风险评估 - 识别潜在风险和挑战
+5. 创新程度 - 评估想法的新颖性
+
+如果需要获取最新信息，请使用搜索工具。
+
+最后，请给出一个0-1之间的可行性评分，并简要说明理由。
+"""
+        
+        return prompt
+    
+    def _select_verification_tools(self, idea_text: str, context: Optional[Dict] = None) -> List[str]:
+        """根据验证需求选择合适的工具"""
+        available_tools = ["web_search"]  # 基础搜索工具
+        
+        # 根据想法类型和上下文选择额外工具
+        if context:
+            stage = context.get('stage', '')
+            if stage == 'thinking_seed':
+                # 思维种子阶段：需要广泛的信息收集
+                available_tools.extend(["idea_verification"])
+            elif stage == 'reasoning_path':
+                # 推理路径阶段：需要深度验证
+                available_tools.extend(["idea_verification"])
+        
+        # 根据想法内容推断需要的工具
+        idea_lower = idea_text.lower()
+        if any(keyword in idea_lower for keyword in ['技术', 'technology', '编程', 'programming']):
+            # 技术类想法可能需要更多技术资源
+            pass  # 未来可以添加技术类验证工具
+        
+        return available_tools
+    
+    def _parse_verification_response(self, llm_response: str) -> Dict[str, Any]:
+        """解析LLM的验证响应"""
+        # 尝试从响应中提取可行性评分
+        import re
+        
+        # 查找评分
+        score_patterns = [
+            r'可行性评分[：:]\s*([0-9]*\.?[0-9]+)',
+            r'评分[：:]\s*([0-9]*\.?[0-9]+)',
+            r'score[：:]?\s*([0-9]*\.?[0-9]+)',
+            r'([0-9]*\.?[0-9]+)\s*/\s*1',
+            r'([0-9]*\.?[0-9]+)\s*分'
+        ]
+        
+        feasibility_score = 0.5  # 默认值
+        for pattern in score_patterns:
+            match = re.search(pattern, llm_response, re.IGNORECASE)
+            if match:
+                try:
+                    score = float(match.group(1))
+                    if score > 1:  # 可能是百分制
+                        score = score / 100
+                    feasibility_score = max(0, min(1, score))  # 限制在0-1范围
+                    break
+                except ValueError:
+                    continue
+        
+        # 提取关键分析要点
+        analysis_summary = llm_response[:500] + "..." if len(llm_response) > 500 else llm_response
+        
+        return {
+            'feasibility_score': feasibility_score,
+            'analysis_summary': analysis_summary,
+            'full_response': llm_response
+        }
+    
+    def _calculate_enhanced_reward(self, verification_analysis: Dict[str, Any], tool_calls: List[Dict]) -> float:
+        """计算增强的奖励分数（考虑工具使用效果）"""
+        base_score = verification_analysis.get('feasibility_score', 0.5)
+        
+        # 工具使用奖励
+        tool_bonus = 0.0
+        if tool_calls:
+            # 成功使用工具获得小幅奖励
+            tool_bonus = min(0.1, len(tool_calls) * 0.05)
+        
+        # 最终奖励分数
+        reward = base_score + tool_bonus - 0.5  # 转换为[-0.5, 0.6]范围
+        
+        return reward
+    
+
+    def _update_verification_stats(self, verification_result: Dict[str, Any], execution_time: float):
+        """更新验证统计信息"""
+        success = verification_result.get('success', False)
+        
+        # 更新组件性能统计
+        current_stats = self.performance_stats['component_performance']['idea_verification']
+        current_stats['calls'] += 1
+        
+        # 更新平均时间
+        if current_stats['calls'] == 1:
+            current_stats['avg_time'] = execution_time
+        else:
+            current_stats['avg_time'] = (current_stats['avg_time'] * (current_stats['calls'] - 1) + execution_time) / current_stats['calls']
+        
+        # 更新成功率
+        if 'total_success' not in current_stats:
+            current_stats['total_success'] = 0
+        
+        if success:
+            current_stats['total_success'] += 1
+        
+        current_stats['success_rate'] = current_stats['total_success'] / current_stats['calls']
+        
+        # 记录工具使用统计
+        verification_method = verification_result.get('verification_method', 'unknown')
+        tool_calls_made = verification_result.get('tool_calls_made', 0)
+        
+        if 'verification_methods' not in current_stats:
+            current_stats['verification_methods'] = {}
+        
+        if verification_method not in current_stats['verification_methods']:
+            current_stats['verification_methods'][verification_method] = 0
+        current_stats['verification_methods'][verification_method] += 1
+        
+        if 'tool_usage' not in current_stats:
+            current_stats['tool_usage'] = {'total_calls': 0, 'calls_per_verification': 0}
+        
+        current_stats['tool_usage']['total_calls'] += tool_calls_made
+        current_stats['tool_usage']['calls_per_verification'] = current_stats['tool_usage']['total_calls'] / current_stats['calls']
+        
+        logger.debug(f"📊 验证统计更新: 成功率={current_stats['success_rate']:.1%}, 方法={verification_method}, 工具调用={tool_calls_made}")
+    
+    def _create_direct_failure_result(self, idea_text: str, error_message: str, execution_time: float = 0.0) -> Dict[str, Any]:
+        """创建直接失败结果（无回退机制）"""
+        return {
+            'success': False,
+            'idea_text': idea_text,
+            'feasibility_analysis': {
+                'feasibility_score': 0.0,  # 失败时给予最低评分
+                'analysis_summary': f"工具增强验证失败: {error_message}。系统将依赖MAB学习避免此类路径。"
+            },
+            'reward_score': -0.5,  # 强负奖励，让MAB系统学会避免导致失败的路径
+            'error_message': error_message,
+            'execution_time': execution_time,
+            'verification_method': 'tool_enhanced_failed',
+            'tool_calls_made': 0,
+            'tool_results': {}
+        }
     
     def _preprocess_idea_text(self, idea_text: str) -> str:
         """预处理想法文本"""
@@ -1339,274 +1786,19 @@ class MainController:
         
         return found_concepts[:3]  # 返回前3个概念
     
-    def _analyze_idea_feasibility(self, idea_text: str, search_response: SearchResponse, 
-                                context: Optional[Dict] = None) -> Dict[str, Any]:
-        """
-        LLM分析想法可行性
-        
-        Args:
-            idea_text: 想法文本
-            search_response: 搜索响应
-            context: 上下文
-            
-        Returns:
-            可行性分析结果
-        """
-        if not self.llm_client:
-            logger.warning("⚠️ LLM客户端不可用，使用启发式分析")
-            logger.warning(f"   客户端状态: {self.llm_client}")
-            logger.warning(f"   API密钥状态: {'已设置' if self.api_key else '未设置'}")
-            logger.warning(f"   建议: 检查API密钥配置和网络连接")
-            return self._heuristic_feasibility_analysis(idea_text, search_response)
-        
-        # 构建分析提示
-        analysis_prompt = self._build_feasibility_analysis_prompt(
-            idea_text, search_response, context
-        )
-        
-        try:
-            # 调用LLM进行分析
-            llm_response = self.llm_client.call_api(analysis_prompt, temperature=0.3)
-            
-            # 解析LLM响应
-            analysis_result = self._parse_feasibility_analysis(llm_response)
-            
-            logger.debug(f"🧠 LLM可行性分析: {analysis_result.get('feasibility_score', 0.5):.2f}")
-            return analysis_result
-            
-        except Exception as e:
-            logger.error(f"❌ LLM分析失败: {e}")
-            return self._heuristic_feasibility_analysis(idea_text, search_response)
+    # 🗑️ 已移除 _analyze_idea_feasibility - 传统验证系统的一部分
     
-    def _build_feasibility_analysis_prompt(self, idea_text: str, search_response: SearchResponse,
-                                         context: Optional[Dict] = None) -> str:
-        """构建可行性分析提示"""
-        
-        # 整理搜索结果
-        search_summary = ""
-        for i, result in enumerate(search_response.results[:3], 1):
-            search_summary += f"{i}. {result.title}\n   {result.snippet}\n\n"
-        
-        # 使用专门的提示模板
-        analysis_prompt = f"""
-作为一位严谨的技术分析师，请根据提供的搜索资料，判断以下想法的可行性。
-
-🎯 **待分析想法**:
-{idea_text}
-
-🔍 **搜索到的相关资料**:
-{search_summary}
-
-📊 **上下文信息**:
-{context if context else '无特定上下文'}
-
-请从以下维度进行深度分析：
-
-1. **技术可行性**: 从技术实现角度评估这个想法是否可行
-2. **实施复杂度**: 分析实施过程中可能遇到的技术复杂度
-3. **风险评估**: 识别潜在的技术风险和挑战
-4. **成功概率**: 基于当前技术水平评估成功概率
-5. **改进建议**: 提出优化和改进的建议
-
-请按以下JSON格式严格返回分析结果：
-{{
-    "feasibility_score": 0.0-1.0的可行性评分,
-    "confidence_level": 0.0-1.0的分析置信度,
-    "technical_feasibility": {{
-        "score": 0.0-1.0,
-        "reasoning": "技术可行性分析理由"
-    }},
-    "complexity_assessment": {{
-        "score": 0.0-1.0,
-        "level": "low|medium|high",
-        "reasoning": "复杂度评估理由"
-    }},
-    "risk_analysis": {{
-        "risk_level": 0.0-1.0,
-        "key_risks": ["风险1", "风险2", "风险3"],
-        "mitigation_strategies": ["应对策略1", "应对策略2"]
-    }},
-    "implementation_recommendations": [
-        "建议1", "建议2", "建议3"
-    ],
-    "evidence_support": {{
-        "supporting_evidence": ["支持证据1", "支持证据2"],
-        "contradicting_evidence": ["反对证据1", "反对证据2"]
-    }},
-    "overall_assessment": "综合评估总结"
-}}
-
-请基于专业知识和搜索资料，给出客观、准确的分析。
-"""
-        
-        return analysis_prompt
+    # 🗑️ 已移除 _build_feasibility_analysis_prompt - 传统验证系统的一部分
     
-    def _parse_feasibility_analysis(self, llm_response: str) -> Dict[str, Any]:
-        """解析LLM的可行性分析响应"""
-        try:
-            # 尝试解析JSON响应
-            import json
-            import re
-            
-            # 提取JSON部分
-            json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                analysis_result = json.loads(json_str)
-                
-                # 验证必要字段
-                if 'feasibility_score' in analysis_result and 'confidence_level' in analysis_result:
-                    return analysis_result
-            
-            # 如果解析失败，返回默认结构
-            logger.warning("⚠️ LLM响应解析失败，使用默认分析结构")
-            return self._create_default_analysis_result(llm_response)
-            
-        except Exception as e:
-            logger.error(f"❌ 可行性分析解析失败: {e}")
-            return self._create_default_analysis_result(llm_response)
+    # 🗑️ 已移除 _parse_feasibility_analysis - 传统验证系统的一部分
     
-    def _create_default_analysis_result(self, raw_response: str) -> Dict[str, Any]:
-        """创建默认的分析结果"""
-        return {
-            "feasibility_score": 0.5,
-            "confidence_level": 0.3,
-            "technical_feasibility": {
-                "score": 0.5,
-                "reasoning": "LLM响应解析失败，使用默认评估"
-            },
-            "complexity_assessment": {
-                "score": 0.5,
-                "level": "medium",
-                "reasoning": "无法确定复杂度，使用中等评估"
-            },
-            "risk_analysis": {
-                "risk_level": 0.5,
-                "key_risks": ["响应解析失败", "分析不确定"],
-                "mitigation_strategies": ["人工复核", "补充信息"]
-            },
-            "implementation_recommendations": [
-                "需要更详细的分析",
-                "建议人工验证",
-                "补充技术细节"
-            ],
-            "evidence_support": {
-                "supporting_evidence": [],
-                "contradicting_evidence": []
-            },
-            "overall_assessment": f"分析响应解析失败，原始响应长度: {len(raw_response)}字符",
-            "raw_response": raw_response[:500]  # 保留部分原始响应用于调试
-        }
+    # 🗑️ 已移除 _create_default_analysis_result - 传统验证系统的一部分
     
-    def _heuristic_feasibility_analysis(self, idea_text: str, search_response: SearchResponse) -> Dict[str, Any]:
-        """启发式可行性分析（当LLM不可用时的备用方法）"""
-        
-        # 基于搜索结果数量和相关性的简单评估
-        result_count = len(search_response.results)
-        avg_relevance = sum(r.relevance_score for r in search_response.results) / max(result_count, 1)
-        
-        # 基于文本特征的复杂度评估
-        complexity_indicators = ['复杂', '困难', '挑战', '高级', '分布式', '并发']
-        complexity_score = sum(1 for indicator in complexity_indicators if indicator in idea_text) / len(complexity_indicators)
-        
-        feasibility_score = min(1.0, avg_relevance * 0.7 + (1 - complexity_score) * 0.3)
-        
-        return {
-            "feasibility_score": feasibility_score,
-            "confidence_level": 0.4,  # 启发式分析置信度较低
-            "technical_feasibility": {
-                "score": feasibility_score,
-                "reasoning": "基于搜索结果相关性和文本复杂度的启发式评估"
-            },
-            "complexity_assessment": {
-                "score": complexity_score,
-                "level": "high" if complexity_score > 0.6 else "medium" if complexity_score > 0.3 else "low",
-                "reasoning": f"检测到{complexity_score:.1%}的复杂度指标"
-            },
-            "risk_analysis": {
-                "risk_level": complexity_score,
-                "key_risks": ["技术复杂度", "实施难度"],
-                "mitigation_strategies": ["分步实施", "技术调研"]
-            },
-            "implementation_recommendations": [
-                "进行更详细的技术调研",
-                "考虑分阶段实施",
-                "寻求专家建议"
-            ],
-            "evidence_support": {
-                "supporting_evidence": [f"找到{result_count}个相关搜索结果"],
-                "contradicting_evidence": []
-            },
-            "overall_assessment": f"启发式分析: 可行性{feasibility_score:.1%}，复杂度{complexity_score:.1%}",
-            "analysis_method": "heuristic"
-        }
+    # 🗑️ 已移除 _heuristic_feasibility_analysis - 传统验证系统的一部分
     
-    def _calculate_verification_reward(self, feasibility_analysis: Dict[str, Any]) -> float:
-        """
-        计算验证奖惩分数
-        
-        Args:
-            feasibility_analysis: 可行性分析结果
-            
-        Returns:
-            奖惩分数 (-1.0 到 +1.0)
-        """
-        feasibility_score = feasibility_analysis.get('feasibility_score', 0.5)
-        confidence_level = feasibility_analysis.get('confidence_level', 0.5)
-        risk_level = feasibility_analysis.get('risk_analysis', {}).get('risk_level', 0.5)
-        
-        # 基础奖励计算
-        if feasibility_score >= 0.7:
-            # 高可行性 -> 正奖励
-            base_reward = (feasibility_score - 0.5) * 2  # 0.4 到 1.0
-        elif feasibility_score <= 0.3:
-            # 低可行性 -> 负奖励  
-            base_reward = (feasibility_score - 0.5) * 2  # -1.0 到 -0.4
-        else:
-            # 中等可行性 -> 小幅奖励/惩罚
-            base_reward = (feasibility_score - 0.5) * 0.5  # -0.1 到 0.1
-        
-        # 置信度调整
-        confidence_multiplier = 0.5 + confidence_level * 0.5  # 0.5 到 1.0
-        
-        # 风险调整
-        risk_penalty = risk_level * 0.2  # 最多扣除0.2分
-        
-        # 最终奖励计算
-        final_reward = (base_reward * confidence_multiplier) - risk_penalty
-        
-        # 限制在合理范围内
-        final_reward = max(-1.0, min(1.0, final_reward))
-        
-        logger.debug(f"🏆 奖励计算: 基础={base_reward:.3f}, 置信度×{confidence_multiplier:.3f}, 风险-{risk_penalty:.3f} = {final_reward:.3f}")
-        
-        return final_reward
+    # 🗑️ 已移除 _calculate_verification_reward - 传统验证系统的一部分
     
-    def _create_fallback_verification_result(self, idea_text: str, error_reason: str, 
-                                           processing_time: float = 0.0) -> Dict[str, Any]:
-        """创建备用验证结果（当验证过程失败时）"""
-        return {
-            'idea_text': idea_text,
-            'cleaned_idea': idea_text,
-            'search_query': "验证失败",
-            'search_results': [],
-            'search_stats': {
-                'total_results': 0,
-                'search_time': 0.0,
-                'success': False
-            },
-            'feasibility_analysis': {
-                "feasibility_score": 0.3,  # 失败时给予较低分数
-                "confidence_level": 0.1,
-                "overall_assessment": f"验证失败: {error_reason}"
-            },
-            'reward_score': -0.5,  # 失败惩罚
-            'verification_time': processing_time,
-            'timestamp': time.time(),
-            'error': error_reason,
-            'fallback': True
-        }
-    
+
     def _update_verification_performance(self, verification_result: Dict[str, Any]):
         """更新验证性能统计"""
         perf_stats = self.performance_stats['component_performance']['idea_verification']
@@ -1808,7 +2000,17 @@ class MainController:
 请生成一个全新的创新思维种子，避开失败模式，提供创新视角：
 """
             
-            innovative_response = self.llm_client.call_api(innovation_prompt, temperature=0.8)
+            # 使用正确的LLM调用接口
+            if self.llm_manager:
+                llm_result = self.llm_manager.chat_completion(innovation_prompt, temperature=0.8)
+                if llm_result.success:
+                    innovative_response = llm_result.content
+                else:
+                    raise Exception(f"LLM调用失败: {llm_result.error_message}")
+            elif self.llm_client:
+                innovative_response = self.llm_client.call_api(innovation_prompt, temperature=0.8)
+            else:
+                raise Exception("没有可用的LLM客户端")
             
             # 简单提取响应内容
             if len(innovative_response) > 50:
