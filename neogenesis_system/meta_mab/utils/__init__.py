@@ -47,6 +47,42 @@ from .search_client import (
     SearchResponse
 )
 
+# 🔧 新增：统一工具抽象接口
+from .tool_abstraction import (
+    BaseTool,
+    AsyncBaseTool,
+    BatchProcessingTool,
+    ToolCategory,
+    ToolResult,
+    ToolCapability,
+    ToolStatus,
+    ToolRegistry,
+    global_tool_registry,
+    # 工具管理函数
+    register_tool,
+    unregister_tool,
+    get_tool,
+    execute_tool,
+    list_available_tools,
+    search_tools,
+    get_tools_by_category,
+    disable_tool,
+    enable_tool,
+    get_tool_info,
+    get_registry_stats,
+    health_check,
+    export_registry_config
+)
+
+# 🔧 新增：搜索工具（Tool接口封装）
+from .search_tools import (
+    WebSearchTool,
+    IdeaVerificationTool,
+    create_and_register_search_tools,
+    quick_web_search,
+    quick_idea_verification
+)
+
 __all__ = [
     # 通用工具函数（已迁移到独立模块）
     "parse_json_response", 
@@ -70,9 +106,41 @@ __all__ = [
     "get_or_create_client", 
     "clear_client_cache",
     
-    # 搜索工具客户端
+    # 搜索工具客户端（原有）
     "WebSearchClient",
     "IdeaVerificationSearchClient",
     "SearchResult",
-    "SearchResponse"
+    "SearchResponse",
+    
+    # 🔧 新增：统一工具抽象接口
+    "BaseTool",
+    "AsyncBaseTool", 
+    "BatchProcessingTool",
+    "ToolCategory",
+    "ToolResult",
+    "ToolCapability",
+    "ToolStatus",
+    "ToolRegistry",
+    "global_tool_registry",
+    # 工具管理函数
+    "register_tool",
+    "unregister_tool",
+    "get_tool",
+    "execute_tool",
+    "list_available_tools",
+    "search_tools",
+    "get_tools_by_category",
+    "disable_tool",
+    "enable_tool",
+    "get_tool_info",
+    "get_registry_stats",
+    "health_check",
+    "export_registry_config",
+    
+    # 🔧 新增：搜索工具（Tool接口封装）
+    "WebSearchTool",
+    "IdeaVerificationTool", 
+    "create_and_register_search_tools",
+    "quick_web_search",
+    "quick_idea_verification"
 ]
