@@ -20,11 +20,19 @@ import json
 import time
 import hashlib
 import logging
+import asyncio
 import requests
 from typing import Optional, Dict, Any, List, Union, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from contextlib import contextmanager
+
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    httpx = None
 
 from config import API_CONFIG, DEEPSEEK_CHAT_ENDPOINT, DEEPSEEK_MODEL
 from ..llm_base import (
@@ -156,7 +164,7 @@ class DeepSeekClient(BaseLLMClient):
         Args:
             config: 客户端配置（ClientConfig或LLMConfig）
         """
-        # 配置转换
+        # 配置转换和验证
         if isinstance(config, LLMConfig):
             # 新的统一配置格式
             llm_config = config
@@ -170,7 +178,12 @@ class DeepSeekClient(BaseLLMClient):
         super().__init__(llm_config)
         
         # DeepSeek特有的指标系统
-        self.metrics = ClientMetrics()
+        # 检查是否启用指标
+        enable_metrics = getattr(self.config, 'enable_metrics', True)
+        if enable_metrics:
+            self.metrics = ClientMetrics()
+        else:
+            self.metrics = None
         
         # 初始化 requests.Session
         self.session = requests.Session()
@@ -184,6 +197,13 @@ class DeepSeekClient(BaseLLMClient):
         if self.config.proxies:
             self.session.proxies.update(self.config.proxies)
         
+        # 🚀 初始化异步客户端
+        self.async_client = None
+        if HTTPX_AVAILABLE:
+            self._init_async_client()
+        else:
+            logger.warning("⚠️ httpx未安装，异步功能不可用。请安装: pip install httpx")
+        
         # 请求缓存
         self._cache: Dict[str, tuple] = {}  # key -> (response, timestamp)
         
@@ -192,9 +212,13 @@ class DeepSeekClient(BaseLLMClient):
         self._request_interval = getattr(self.config, 'request_interval', 1.0)  # 默认1秒间隔
         
         logger.info(f"🚀 DeepSeekClient 初始化完成")
-        logger.info(f"   模型: {self.config.model}")
+        # 兼容旧的ClientConfig和新的LLMConfig
+        model_name = getattr(self.config, 'model', None) or getattr(self.config, 'model_name', 'deepseek-chat')
+        logger.info(f"   模型: {model_name}")
         logger.info(f"   缓存: {'启用' if self.config.enable_cache else '禁用'}")
-        logger.info(f"   指标: {'启用' if self.config.enable_metrics else '禁用'}")
+        # 兼容新旧配置格式
+        enable_metrics = getattr(self.config, 'enable_metrics', True)
+        logger.info(f"   指标: {'启用' if enable_metrics else '禁用'}")
         logger.info(f"   请求间隔: {self._request_interval}s")
     
     def _convert_llm_config_to_client_config(self, llm_config: LLMConfig) -> ClientConfig:
@@ -210,9 +234,38 @@ class DeepSeekClient(BaseLLMClient):
             max_tokens=llm_config.max_tokens,
             enable_cache=llm_config.enable_cache,
             cache_ttl=llm_config.cache_ttl,
+            enable_metrics=True,  # 为LLMConfig设置默认值
             proxies=llm_config.proxies,
             request_interval=llm_config.request_interval
         )
+    
+    def _init_async_client(self):
+        """🚀 初始化异步HTTP客户端"""
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.config.api_key}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'Neogenesis-System/1.0'
+            }
+            
+            # 配置异步客户端
+            client_kwargs = {
+                'headers': headers,
+                'timeout': httpx.Timeout(self.config.timeout),
+                'limits': httpx.Limits(max_keepalive_connections=10, max_connections=100)
+            }
+            
+            if self.config.proxies:
+                client_kwargs['proxies'] = self.config.proxies
+            
+            self.async_client = httpx.AsyncClient(**client_kwargs)
+            logger.debug("🚀 异步HTTP客户端初始化完成")
+            
+        except Exception as e:
+            logger.error(f"❌ 异步客户端初始化失败: {e}")
+            self.async_client = None
+    
+    # ==================== 聊天完成API接口 ====================
     
     def chat_completion(self, 
                        messages: Union[str, List[LLMMessage]], 
@@ -239,7 +292,8 @@ class DeepSeekClient(BaseLLMClient):
         # 参数处理
         temperature = temperature or self.config.temperature
         max_tokens = max_tokens or self.config.max_tokens
-        model = kwargs.get('model') or self.config.model
+        # 兼容新旧配置格式
+        model = kwargs.get('model') or getattr(self.config, 'model', None) or getattr(self.config, 'model_name', 'deepseek-chat')
         enable_cache = kwargs.get('enable_cache', self.config.enable_cache)
         
         # 转换为DeepSeek API格式
@@ -282,7 +336,93 @@ class DeepSeekClient(BaseLLMClient):
             self._cleanup_cache()
         
         # 更新指标
-        if self.config.enable_metrics:
+        enable_metrics = getattr(self.config, 'enable_metrics', True)
+        if enable_metrics and self.metrics:
+            self._update_metrics(api_response)
+        
+        # 更新父类统计
+        self._update_stats(llm_response)
+        
+        return llm_response
+    
+    async def achat_completion(self, 
+                              messages: Union[str, List[LLMMessage]], 
+                              temperature: Optional[float] = None,
+                              max_tokens: Optional[int] = None,
+                              **kwargs) -> LLMResponse:
+        """
+        🚀 异步聊天完成API调用 - 统一接口实现
+        
+        Args:
+            messages: 消息内容，可以是字符串或消息列表
+            temperature: 温度参数
+            max_tokens: 最大token数
+            **kwargs: 其他参数
+            
+        Returns:
+            LLMResponse: 统一的响应对象
+        """
+        if not HTTPX_AVAILABLE:
+            raise RuntimeError("httpx未安装，无法使用异步功能。请安装: pip install httpx")
+        
+        if not self.async_client:
+            self._init_async_client()
+            if not self.async_client:
+                raise RuntimeError("异步客户端初始化失败")
+        
+        start_time = time.time()
+        
+        # 准备消息格式
+        prepared_messages = self._prepare_messages(messages)
+        
+        # 参数处理
+        temperature = temperature or self.config.temperature
+        max_tokens = max_tokens or self.config.max_tokens
+        model = kwargs.get('model') or getattr(self.config, 'model', None) or getattr(self.config, 'model_name', 'deepseek-chat')
+        enable_cache = kwargs.get('enable_cache', self.config.enable_cache)
+        
+        # 转换为DeepSeek API格式
+        api_messages = []
+        for msg in prepared_messages:
+            api_messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+        
+        # 构建请求数据
+        request_data = {
+            'model': model,
+            'messages': api_messages,
+            'temperature': temperature,
+            'max_tokens': max_tokens
+        }
+        
+        # 检查缓存
+        cache_key = self._generate_cache_key(request_data)
+        if enable_cache and self._is_cache_valid(cache_key):
+            cached_api_response, _ = self._cache[cache_key]
+            self.metrics.cache_hits += 1
+            logger.debug(f"📋 使用缓存响应: {cache_key[:16]}...")
+            
+            # 转换为统一格式
+            llm_response = cached_api_response.to_llm_response("deepseek")
+            self._update_stats(llm_response)
+            return llm_response
+        
+        # 🚀 执行异步API调用
+        api_response = await self._aexecute_request(request_data, start_time)
+        
+        # 转换为统一格式
+        llm_response = api_response.to_llm_response("deepseek")
+        
+        # 更新缓存
+        if enable_cache and api_response.success:
+            self._cache[cache_key] = (api_response, time.time())
+            self._cleanup_cache()
+        
+        # 更新指标
+        enable_metrics = getattr(self.config, 'enable_metrics', True)
+        if enable_metrics and self.metrics:
             self._update_metrics(api_response)
         
         # 更新父类统计
@@ -436,7 +576,7 @@ class DeepSeekClient(BaseLLMClient):
                 status_code=response.status_code,
                 response_time=response_time,
                 tokens_used=tokens_used,
-                model_used=data.get('model', self.config.model)
+                model_used=data.get('model', getattr(self.config, 'model', None) or getattr(self.config, 'model_name', 'deepseek-chat'))
             )
             
         except (KeyError, json.JSONDecodeError) as e:
@@ -544,6 +684,9 @@ class DeepSeekClient(BaseLLMClient):
     
     def _update_metrics(self, response: APIResponse):
         """更新性能指标"""
+        if not self.metrics:
+            return
+            
         self.metrics.total_requests += 1
         
         if response.success:
@@ -556,14 +699,17 @@ class DeepSeekClient(BaseLLMClient):
                 self.metrics.error_counts[response.error_type] = \
                     self.metrics.error_counts.get(response.error_type, 0) + 1
     
-    def get_metrics(self) -> ClientMetrics:
+    def get_metrics(self) -> Optional[ClientMetrics]:
         """获取客户端性能指标"""
         return self.metrics
     
     def reset_metrics(self):
         """重置性能指标"""
-        self.metrics = ClientMetrics()
-        logger.info("📊 性能指标已重置")
+        if self.metrics:
+            self.metrics = ClientMetrics()
+            logger.info("📊 性能指标已重置")
+        else:
+            logger.debug("📊 性能指标功能未启用")
     
     def clear_cache(self):
         """清空缓存"""
@@ -630,12 +776,187 @@ class DeepSeekClient(BaseLLMClient):
         """
         return [
             "chat_completion", 
+            "achat_completion",  # 🚀 新增异步支持
             "text_generation", 
             "chinese_language",
             "coding_assistance",
             "caching",
             "retry_mechanism"
         ]
+    
+    # ==================== 🚀 异步请求执行方法 ====================
+    
+    async def _aexecute_request(self, request_data: Dict[str, Any], start_time: float) -> APIResponse:
+        """
+        🚀 异步执行API请求
+        
+        Args:
+            request_data: 请求数据
+            start_time: 开始时间
+            
+        Returns:
+            APIResponse: API响应对象
+        """
+        if not self.async_client:
+            raise RuntimeError("异步客户端未初始化")
+        
+        # 🔧 频率控制（异步版本）
+        current_time = time.time()
+        time_since_last = current_time - self._last_request_time
+        if time_since_last < self._request_interval:
+            wait_time = self._request_interval - time_since_last
+            logger.debug(f"⏱️ 异步频率控制，等待 {wait_time:.1f}s")
+            await asyncio.sleep(wait_time)
+        
+        self._last_request_time = time.time()
+        
+        last_error = None
+        
+        for attempt in range(self.config.max_retries):
+            try:
+                logger.debug(f"🚀 异步API调用尝试 {attempt + 1}/{self.config.max_retries}")
+                
+                response = await self.async_client.post(
+                    f"{self.config.base_url}/chat/completions",
+                    json=request_data,
+                    timeout=self.config.timeout
+                )
+                
+                response_time = time.time() - start_time
+                
+                # 处理成功响应
+                if response.status_code == 200:
+                    return self._aprocess_success_response(response, response_time)
+                
+                # 处理错误响应
+                error_response = self._aprocess_error_response(response, response_time)
+                
+                # 决定是否重试
+                if not self._should_retry(error_response.error_type, attempt):
+                    return error_response
+                
+                # 计算等待时间并重试
+                wait_time = self._calculate_retry_delay(error_response.error_type, attempt)
+                logger.warning(f"🔄 异步等待 {wait_time:.1f}s 后重试...")
+                await asyncio.sleep(wait_time)
+                last_error = error_response
+                
+            except Exception as e:
+                # 简化异常处理，兼容httpx不可用的情况
+                response_time = time.time() - start_time
+                error_type = LLMErrorType.TIMEOUT_ERROR if 'timeout' in str(e).lower() else LLMErrorType.NETWORK_ERROR
+                last_error = APIResponse(
+                    success=False,
+                    error_type=error_type,
+                    error_message=f"异步请求错误: {str(e)}",
+                    response_time=response_time
+                )
+                
+                if attempt < self.config.max_retries - 1:
+                    wait_time = 3 * (attempt + 1)
+                    logger.warning(f"🔄 异步错误重试，等待 {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    break
+        
+        # 所有重试都失败了
+        if self.metrics:
+            self.metrics.total_failures += 1
+        return last_error or APIResponse(
+            success=False,
+            error_type=LLMErrorType.UNKNOWN_ERROR,
+            error_message="异步API调用失败：所有重试都已用尽",
+            response_time=time.time() - start_time
+        )
+    
+    def _aprocess_success_response(self, response, response_time: float) -> APIResponse:
+        """🚀 处理异步成功响应"""
+        try:
+            response_data = response.json()
+            
+            # 提取消息内容
+            content = ""
+            if 'choices' in response_data and response_data['choices']:
+                choice = response_data['choices'][0]
+                if 'message' in choice:
+                    content = choice['message'].get('content', '')
+                elif 'text' in choice:
+                    content = choice.get('text', '')
+            
+            # 更新指标
+            if self.metrics:
+                self.metrics.total_requests += 1
+                self.metrics.successful_requests += 1
+                self.metrics.total_response_time += response_time
+                
+                # 统计token使用
+                if 'usage' in response_data:
+                    usage = response_data['usage']
+                    self.metrics.total_tokens += usage.get('total_tokens', 0)
+                    self.metrics.prompt_tokens += usage.get('prompt_tokens', 0)
+                    self.metrics.completion_tokens += usage.get('completion_tokens', 0)
+            
+            logger.debug(f"🚀 异步API调用成功，响应时间: {response_time:.2f}s")
+            
+            return APIResponse(
+                success=True,
+                content=content,
+                raw_response=response_data,
+                status_code=response.status_code,
+                response_time=response_time
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ 异步响应解析失败: {e}")
+            return APIResponse(
+                success=False,
+                error_type=LLMErrorType.PARSE_ERROR,
+                error_message=f"异步响应解析失败: {str(e)}",
+                status_code=getattr(response, 'status_code', 0),
+                response_time=response_time
+            )
+    
+    def _aprocess_error_response(self, response, response_time: float) -> APIResponse:
+        """🚀 处理异步错误响应"""
+        try:
+            error_data = response.json()
+            error_message = error_data.get('error', {}).get('message', f'HTTP {response.status_code}')
+        except:
+            error_message = f"HTTP {response.status_code}: 响应解析失败"
+        
+        # 错误类型映射
+        error_type = LLMErrorType.SERVER_ERROR
+        if response.status_code == 401:
+            error_type = LLMErrorType.AUTHENTICATION
+        elif response.status_code == 429:
+            error_type = LLMErrorType.RATE_LIMIT
+        elif response.status_code == 403:
+            error_type = LLMErrorType.QUOTA_EXCEEDED
+        elif response.status_code == 400:
+            error_type = LLMErrorType.INVALID_REQUEST
+        
+        # 更新指标
+        if self.metrics:
+            self.metrics.total_requests += 1
+            self.metrics.failed_requests += 1
+            self.metrics.error_counts[error_type.value] = self.metrics.error_counts.get(error_type.value, 0) + 1
+        
+        logger.warning(f"⚠️ 异步API错误 {response.status_code}: {error_message}")
+        
+        return APIResponse(
+            success=False,
+            error_type=error_type,
+            error_message=error_message,
+            status_code=response.status_code,
+            response_time=response_time
+        )
+    
+    async def aclose(self):
+        """🚀 关闭异步客户端"""
+        if self.async_client:
+            await self.async_client.aclose()
+            self.async_client = None
+            logger.debug("🚀 异步HTTP客户端已关闭")
 
 
 # 工厂函数和便捷接口
@@ -695,3 +1016,5 @@ def quick_chat(api_key: str, prompt: str, system_message: Optional[str] = None) 
             return response.content
         else:
             raise Exception(f"API调用失败: {response.error_message}")
+
+       
