@@ -197,9 +197,52 @@ class LLMManager:
             logger.debug(f"🔍 {provider_name}健康检查失败: {e}")
             return False
     
+    def call_api(self, prompt: str, 
+                 system_message: Optional[str] = None,
+                 temperature: Optional[float] = None,
+                 **kwargs) -> str:
+        """
+        简化的API调用接口 - 兼容现有代码
+        
+        Args:
+            prompt: 用户提示
+            system_message: 系统消息
+            temperature: 温度参数
+            **kwargs: 其他参数
+            
+        Returns:
+            str: LLM响应内容
+            
+        Raises:
+            Exception: 调用失败时抛出异常
+        """
+        try:
+            # 构建消息格式
+            messages = []
+            if system_message:
+                messages.append(LLMMessage(role="system", content=system_message))
+            messages.append(LLMMessage(role="user", content=prompt))
+            
+            # 调用chat_completion
+            response = self.chat_completion(
+                messages=messages,
+                temperature=temperature,
+                **kwargs
+            )
+            
+            if response.success:
+                return response.content
+            else:
+                raise Exception(f"LLM调用失败: {response.error_message}")
+                
+        except Exception as e:
+            logger.error(f"❌ LLM API调用失败: {e}")
+            raise
+    
     def chat_completion(self, 
                        messages: Union[str, List[LLMMessage]], 
                        provider_name: Optional[str] = None,
+                       temperature: Optional[float] = None,
                        **kwargs) -> LLMResponse:
         """
         聊天完成 - 智能路由到最佳提供商
@@ -217,10 +260,18 @@ class LLMManager:
         if not self.initialized or not self.providers:
             return self._create_error_response("没有可用的LLM提供商")
         
+        # 处理直接传入字符串的情况
+        if isinstance(messages, str):
+            messages = [LLMMessage(role="user", content=messages)]
+        
         # 选择提供商
         selected_provider = self._select_provider(provider_name)
         if not selected_provider:
             return self._create_error_response("无法选择合适的提供商")
+        
+        # 添加temperature到kwargs中
+        if temperature is not None:
+            kwargs['temperature'] = temperature
         
         # 执行请求（带回退机制）
         return self._execute_with_fallback(selected_provider, messages, **kwargs)
