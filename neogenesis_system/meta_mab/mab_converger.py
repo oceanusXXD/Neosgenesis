@@ -31,6 +31,11 @@ class MABConverger:
         self.convergence_threshold = MAB_CONFIG["convergence_threshold"]  # 收敛阈值
         self.min_samples = MAB_CONFIG["min_samples"]  # 最小样本数
         
+        # 🔧 新增：工具级别的决策臂存储：tool_id -> EnhancedDecisionArm
+        self.tool_arms: Dict[str, EnhancedDecisionArm] = {}
+        self.tool_selection_history = []  # 工具选择历史
+        self.total_tool_selections = 0  # 总工具选择次数
+        
         # 算法选择策略
         self.algorithm_preferences = {
             'thompson_sampling': 0.4,
@@ -42,6 +47,9 @@ class MABConverger:
         self.algorithm_performance = defaultdict(lambda: {'successes': 0, 'total': 0})
         self.path_selection_history = []  # 路径选择历史
         self.total_path_selections = 0  # 总路径选择次数
+        
+        # 🔧 新增：工具级别的性能统计
+        self.tool_algorithm_performance = defaultdict(lambda: {'successes': 0, 'total': 0})
         
         # 🏆 黄金决策模板系统
         self.golden_templates: Dict[str, Dict[str, any]] = {}  # 存储黄金模板
@@ -57,8 +65,9 @@ class MABConverger:
         
         # 🔧 改进方案：采用动态创建策略，在需要时自动创建决策臂
         
-        logger.info("🎰 MABConverger 已初始化 - 阶段三：思维路径选择模式")
+        logger.info("🎰 MABConverger 已初始化 - 双层学习模式：思维路径 + 工具选择")
         logger.info("🏆 黄金决策模板系统已启用")
+        logger.info("🔧 工具选择MAB系统已就绪")
     
     def _create_strategy_arm_if_missing(self, strategy_id: str, path_type: str = None) -> EnhancedDecisionArm:
         """
@@ -83,6 +92,30 @@ class MABConverger:
             logger.debug(f"🆕 动态创建策略决策臂: {strategy_id} ({path_type})")
         
         return self.path_arms[strategy_id]
+    
+    def _create_tool_arm_if_missing(self, tool_id: str, tool_name: str = None) -> EnhancedDecisionArm:
+        """
+        动态创建工具决策臂（如果不存在）
+        
+        Args:
+            tool_id: 工具ID
+            tool_name: 工具名称（可选，如果未提供则使用tool_id）
+            
+        Returns:
+            对应的工具决策臂
+        """
+        if tool_id not in self.tool_arms:
+            if tool_name is None:
+                tool_name = tool_id  # 默认使用tool_id作为工具名称
+            
+            self.tool_arms[tool_id] = EnhancedDecisionArm(
+                path_id=tool_id,
+                option=tool_name
+            )
+            logger.debug(f"🔧 动态创建工具决策臂: {tool_id} ({tool_name})")
+        
+        return self.tool_arms[tool_id]
+    
     def select_best_path(self, paths: List[ReasoningPath], algorithm: str = 'auto') -> ReasoningPath:
         """
         阶段三核心方法：从思维路径列表中选择最优路径（集成黄金模板系统）
@@ -201,6 +234,278 @@ class MABConverger:
             selected_path = np.random.choice(paths)
             logger.info(f"🔄 回退到随机选择路径: {selected_path.path_type}")
             return selected_path
+    
+    def select_best_tool(self, available_tools: List[str], algorithm: str = 'auto') -> str:
+        """
+        🔧 新增：从可用工具列表中选择最优工具
+        
+        Args:
+            available_tools: 可用工具名称列表
+            algorithm: 使用的算法 ('thompson_sampling', 'ucb_variant', 'epsilon_greedy', 'auto')
+            
+        Returns:
+            选择的最优工具名称
+        """
+        if not available_tools:
+            raise ValueError("工具列表不能为空")
+        
+        if len(available_tools) == 1:
+            logger.info(f"🔧 只有一个工具，直接选择: {available_tools[0]}")
+            return available_tools[0]
+        
+        self.total_tool_selections += 1
+        logger.info(f"🔧 开始第 {self.total_tool_selections} 次工具选择，候选工具: {len(available_tools)}个")
+        
+        # 🔧 动态创建：确保所有工具的决策臂都存在
+        available_arms = []
+        tool_to_arm_mapping = {}  # 工具名称到决策臂的映射
+        
+        for tool_name in available_tools:
+            tool_id = tool_name  # 使用工具名称作为ID
+            tool_to_arm_mapping[tool_name] = tool_id
+            
+            # 🔧 动态创建：确保工具决策臂存在
+            arm = self._create_tool_arm_if_missing(tool_id, tool_name)
+            available_arms.append(arm)
+            
+            logger.debug(f"✅ 工具决策臂就绪: {tool_id} ({tool_name})")
+        
+        # 自动选择算法
+        if algorithm == 'auto':
+            algorithm = self._select_best_algorithm_for_tools()
+        
+        # 根据选择的算法进行决策
+        try:
+            if algorithm == 'thompson_sampling':
+                best_arm = self._thompson_sampling_for_tools(available_arms)
+            elif algorithm == 'ucb_variant':
+                best_arm = self._ucb_variant_for_tools(available_arms)
+            elif algorithm == 'epsilon_greedy':
+                best_arm = self._epsilon_greedy_for_tools(available_arms)
+            else:
+                logger.warning(f"⚠️ 未知算法 {algorithm}，使用Thompson采样")
+                best_arm = self._thompson_sampling_for_tools(available_arms)
+            
+            # 更新使用时间和激活次数
+            best_arm.last_used = time.time()
+            best_arm.activation_count += 1
+            
+            # 🎯 找到对应的工具名称
+            selected_tool = best_arm.option  # 工具名称存储在option字段中
+            
+            # 记录选择历史
+            self.tool_selection_history.append({
+                'tool_id': best_arm.path_id,
+                'tool_name': selected_tool,
+                'algorithm': algorithm,
+                'timestamp': time.time(),
+                'selection_round': self.total_tool_selections
+            })
+            
+            logger.info(f"🔧 使用 {algorithm} 选择工具: {selected_tool} (ID: {best_arm.path_id})")
+            return selected_tool
+            
+        except Exception as e:
+            logger.error(f"❌ MAB工具选择算法执行失败: {e}")
+            # 回退到随机选择
+            selected_tool = np.random.choice(available_tools)
+            logger.info(f"🔄 回退到随机选择工具: {selected_tool}")
+            return selected_tool
+    
+    def is_tool_cold(self, tool_name: str) -> Dict[str, any]:
+        """
+        🔍 判断工具是否处于冷启动状态
+        
+        这个方法是MABConverger的"自我认知"能力，当MainController询问时，
+        它能明确回答："我推荐的这个工具，我自己熟不熟？"
+        
+        Args:
+            tool_name: 工具名称
+            
+        Returns:
+            Dict包含详细的冷启动分析结果:
+            {
+                'is_cold_start': bool,      # 是否处于冷启动状态
+                'cold_score': float,        # 冷启动得分 (0-1, 越高越"冷")
+                'confidence': float,        # 经验可信度 (0-1, 越高越可信)
+                'analysis': {
+                    'usage_count': int,     # 使用次数
+                    'reliability_score': float,  # 可靠性分数
+                    'idle_hours': float,    # 空闲时间(小时)
+                    'sample_size': int      # 样本数量
+                },
+                'recommendation': str,      # 推荐模式 ('experience'/'exploration')
+                'reason': str              # 判断理由
+            }
+        """
+        logger.debug(f"🔍 开始冷启动检测: 工具 '{tool_name}'")
+        
+        # 获取冷启动配置
+        cold_start_config = MAB_CONFIG["cold_start_threshold"]
+        detection_weights = cold_start_config["detection_weights"]
+        
+        # 获取工具的决策臂
+        tool_arm = self.tool_arms.get(tool_name)
+        
+        if not tool_arm:
+            # 完全未使用的工具 - 绝对冷启动
+            logger.debug(f"🆕 工具 '{tool_name}' 从未使用过，判定为冷启动")
+            return {
+                'is_cold_start': True,
+                'cold_score': 1.0,
+                'confidence': 0.0,
+                'analysis': {
+                    'usage_count': 0,
+                    'reliability_score': 0.0,
+                    'idle_hours': float('inf'),
+                    'sample_size': 0
+                },
+                'recommendation': 'exploration',
+                'reason': '工具从未被使用过，无任何经验数据'
+            }
+        
+        # 计算各个冷启动因子
+        analysis = self._calculate_cold_start_factors(tool_arm, cold_start_config)
+        
+        # 计算加权冷启动得分
+        cold_score = (
+            analysis['usage_factor'] * detection_weights['usage_frequency'] +
+            analysis['reliability_factor'] * detection_weights['reliability'] +
+            analysis['recency_factor'] * detection_weights['recency'] +
+            analysis['sample_factor'] * detection_weights['sample_sufficiency']
+        )
+        
+        # 判定是否冷启动
+        exploration_threshold = cold_start_config["exploration_trigger_threshold"]
+        is_cold = cold_score > exploration_threshold
+        
+        # 生成判断理由
+        reason = self._generate_cold_start_reason(analysis, cold_score, exploration_threshold)
+        
+        result = {
+            'is_cold_start': is_cold,
+            'cold_score': round(cold_score, 3),
+            'confidence': round(1.0 - cold_score, 3),
+            'analysis': {
+                'usage_count': analysis['usage_count'],
+                'reliability_score': round(analysis['reliability_score'], 3),
+                'idle_hours': round(analysis['idle_hours'], 2),
+                'sample_size': analysis['sample_size']
+            },
+            'recommendation': 'exploration' if is_cold else 'experience',
+            'reason': reason
+        }
+        
+        logger.info(f"🔍 冷启动检测完成: {tool_name} -> "
+                   f"{'冷启动' if is_cold else '经验丰富'} "
+                   f"(得分: {cold_score:.3f}, 置信度: {result['confidence']:.3f})")
+        
+        return result
+    
+    def _calculate_cold_start_factors(self, tool_arm: EnhancedDecisionArm, 
+                                    cold_start_config: Dict[str, any]) -> Dict[str, any]:
+        """
+        计算冷启动各个因子
+        
+        Args:
+            tool_arm: 工具决策臂
+            cold_start_config: 冷启动配置
+            
+        Returns:
+            包含各个因子的分析结果
+        """
+        current_time = time.time()
+        
+        # 1. 使用频率因子 (使用次数越少，分数越高)
+        usage_count = tool_arm.activation_count
+        min_usage = cold_start_config["min_usage_count"]
+        usage_factor = max(0.0, 1.0 - usage_count / max(min_usage, 1))
+        
+        # 2. 可靠性因子 (成功率不稳定或样本少时分数高)
+        total_samples = tool_arm.success_count + tool_arm.failure_count
+        if total_samples >= 3:
+            reliability_score = tool_arm.success_rate
+            # 样本数调整：样本越少，可靠性越低
+            sample_adjustment = min(1.0, total_samples / 10.0)  # 10个样本视为充足
+            adjusted_reliability = reliability_score * sample_adjustment
+        else:
+            adjusted_reliability = 0.0  # 样本太少，不可靠
+        
+        min_reliability = cold_start_config["min_reliability_score"]
+        reliability_factor = max(0.0, 1.0 - adjusted_reliability / max(min_reliability, 0.1))
+        
+        # 3. 最近使用因子 (时间越久，分数越高)
+        if tool_arm.last_used > 0:
+            idle_hours = (current_time - tool_arm.last_used) / 3600
+        else:
+            idle_hours = float('inf')
+        
+        max_idle = cold_start_config["max_idle_hours"]
+        recency_factor = min(1.0, idle_hours / max(max_idle, 1))
+        
+        # 4. 样本充足性因子 (样本越少，分数越高)
+        min_samples = cold_start_config["min_sample_size"]
+        sample_factor = max(0.0, 1.0 - total_samples / max(min_samples, 1))
+        
+        return {
+            'usage_count': usage_count,
+            'usage_factor': usage_factor,
+            'reliability_score': adjusted_reliability,
+            'reliability_factor': reliability_factor,
+            'idle_hours': idle_hours if idle_hours != float('inf') else -1,
+            'recency_factor': recency_factor,
+            'sample_size': total_samples,
+            'sample_factor': sample_factor
+        }
+    
+    def _generate_cold_start_reason(self, analysis: Dict[str, any], 
+                                   cold_score: float, threshold: float) -> str:
+        """
+        生成冷启动判断的详细理由
+        
+        Args:
+            analysis: 分析结果
+            cold_score: 冷启动得分
+            threshold: 判定阈值
+            
+        Returns:
+            判断理由字符串
+        """
+        reasons = []
+        
+        # 使用频率分析
+        if analysis['usage_factor'] > 0.7:
+            reasons.append(f"使用次数过少({analysis['usage_count']}次)")
+        elif analysis['usage_factor'] > 0.3:
+            reasons.append(f"使用经验有限({analysis['usage_count']}次)")
+        
+        # 可靠性分析
+        if analysis['reliability_factor'] > 0.6:
+            reasons.append(f"性能数据不可靠(可靠性:{analysis['reliability_score']:.2f})")
+        elif analysis['reliability_factor'] > 0.3:
+            reasons.append(f"性能数据不够稳定")
+        
+        # 最近使用分析
+        if analysis['idle_hours'] > 72:
+            reasons.append(f"长时间未使用({analysis['idle_hours']:.1f}小时)")
+        elif analysis['idle_hours'] > 24:
+            reasons.append(f"较长时间未使用")
+        
+        # 样本数分析
+        if analysis['sample_factor'] > 0.7:
+            reasons.append(f"样本数据不足({analysis['sample_size']}个)")
+        
+        if not reasons:
+            if cold_score > threshold:
+                reasons.append("综合评估显示缺乏足够经验")
+            else:
+                reasons.append("具有充足的使用经验和可靠数据")
+        
+        # 组合理由
+        if cold_score > threshold:
+            return f"冷启动状态: {'; '.join(reasons)} (得分:{cold_score:.3f} > {threshold})"
+        else:
+            return f"经验丰富: {'; '.join(reasons)} (得分:{cold_score:.3f} ≤ {threshold})"
     
     def _thompson_sampling_for_paths(self, arms: List[EnhancedDecisionArm]) -> EnhancedDecisionArm:
         """针对思维路径的Thompson采样算法"""
@@ -397,39 +702,247 @@ class MABConverger:
         
         return convergence_level
     
-    def update_path_performance(self, path_id: str, success: bool, reward: float = 0.0):
+    # ==================== 🔧 工具选择MAB算法实现 ====================
+    
+    def _select_best_algorithm_for_tools(self) -> str:
         """
-        更新路径的性能反馈 - 🎯 根源修复：直接使用策略ID，无需解析
+        为工具选择选择最佳算法
+        
+        Returns:
+            最佳算法名称
+        """
+        # 如果样本太少，使用Thompson采样进行探索
+        if self.total_tool_selections < 10:
+            logger.debug("📊 工具选择样本较少，选择Thompson采样")
+            return 'thompson_sampling'
+        
+        # 计算工具级别的收敛水平
+        if not self.tool_arms:
+            return 'thompson_sampling'
+        
+        arms_list = list(self.tool_arms.values())
+        convergence_level = self._calculate_tool_convergence_level(arms_list)
+        
+        # 工具选择倾向于更快收敛到最优工具
+        if convergence_level < 0.3:
+            # 低收敛，使用探索性强的算法
+            logger.debug(f"📊 工具选择低收敛({convergence_level:.3f})，选择Thompson采样")
+            return 'thompson_sampling'
+        elif convergence_level < 0.6:
+            # 中等收敛，使用平衡的算法
+            logger.debug(f"📊 工具选择中等收敛({convergence_level:.3f})，选择UCB")
+            return 'ucb_variant'
+        else:
+            # 高收敛，使用利用型算法
+            logger.debug(f"📊 工具选择高收敛({convergence_level:.3f})，选择Epsilon-Greedy")
+            return 'epsilon_greedy'
+    
+    def _calculate_tool_convergence_level(self, arms: List[EnhancedDecisionArm]) -> float:
+        """
+        计算工具级别的收敛水平
         
         Args:
-            path_id: 策略ID（现在数据源头保证是确定性的）
+            arms: 工具决策臂列表
+            
+        Returns:
+            收敛水平 (0.0-1.0)
+        """
+        if len(arms) < 2:
+            return 0.0
+        
+        # 计算工具成功率方差
+        success_rates = []
+        for arm in arms:
+            total = arm.success_count + arm.failure_count
+            if total > 0:
+                success_rates.append(arm.success_count / total)
+        
+        if len(success_rates) < 2:
+            return 0.0
+        
+        variance = np.var(success_rates)
+        # 工具选择可以更快收敛，收敛标准相对严格
+        convergence_level = max(0.0, 1.0 - variance * 2.5)
+        
+        return convergence_level
+    
+    def _thompson_sampling_for_tools(self, arms: List[EnhancedDecisionArm]) -> EnhancedDecisionArm:
+        """针对工具选择的Thompson采样算法"""
+        if not arms:
+            raise ValueError("没有可用的工具决策臂")
+        
+        best_arm = None
+        best_score = -1
+        
+        logger.debug(f"🔧 Thompson采样工具选择，候选工具: {len(arms)}个")
+        
+        for arm in arms:
+            # 使用Beta分布进行Thompson采样
+            alpha = arm.success_count + 1
+            beta = arm.failure_count + 1
+            
+            # 从Beta分布中采样
+            sampled_value = np.random.beta(alpha, beta)
+            
+            # 工具级别的奖励考虑
+            if arm.rl_reward_history:
+                avg_reward = sum(arm.rl_reward_history) / len(arm.rl_reward_history)
+                # 将奖励调整到0-1范围
+                normalized_reward = max(0, min(1, (avg_reward + 1) / 2))
+                sampled_value = sampled_value * 0.7 + normalized_reward * 0.3
+            
+            logger.debug(f"   工具 {arm.path_id}: sampled={sampled_value:.3f}, α={alpha}, β={beta}")
+            
+            if sampled_value > best_score:
+                best_score = sampled_value
+                best_arm = arm
+        
+        logger.debug(f"🏆 Thompson采样选择工具: {best_arm.path_id} (得分: {best_score:.3f})")
+        return best_arm
+    
+    def _ucb_variant_for_tools(self, arms: List[EnhancedDecisionArm]) -> EnhancedDecisionArm:
+        """针对工具选择的UCB (Upper Confidence Bound) 变种算法"""
+        if not arms:
+            raise ValueError("没有可用的工具决策臂")
+        
+        total_rounds = sum(arm.activation_count for arm in arms)
+        if total_rounds == 0:
+            # 第一轮随机选择
+            selected_arm = np.random.choice(arms)
+            logger.debug(f"🔧 UCB首轮随机选择工具: {selected_arm.path_id}")
+            return selected_arm
+        
+        best_arm = None
+        best_ucb_value = -float('inf')
+        
+        logger.debug(f"📊 UCB工具选择，总轮数: {total_rounds}")
+        
+        for arm in arms:
+            if arm.activation_count == 0:
+                # 未尝试过的工具优先选择
+                logger.debug(f"🆕 优先选择未使用工具: {arm.path_id}")
+                return arm
+            
+            # 计算UCB值
+            confidence_bound = np.sqrt(2 * np.log(total_rounds) / arm.activation_count)
+            
+            # 基础成功率
+            base_value = arm.success_rate
+            
+            # 工具级别的RL奖励考虑
+            if arm.rl_reward_history:
+                avg_reward = sum(arm.rl_reward_history) / len(arm.rl_reward_history)
+                normalized_reward = max(0, min(1, (avg_reward + 1) / 2))
+                base_value = base_value * 0.6 + normalized_reward * 0.4
+            
+            # 工具探索奖励
+            exploration_bonus = confidence_bound * 1.0  # 标准探索
+            ucb_value = base_value + exploration_bonus
+            
+            logger.debug(f"   工具 {arm.path_id}: UCB={ucb_value:.3f}, base={base_value:.3f}, conf={confidence_bound:.3f}")
+            
+            if ucb_value > best_ucb_value:
+                best_ucb_value = ucb_value
+                best_arm = arm
+        
+        logger.debug(f"🏆 UCB选择工具: {best_arm.path_id} (UCB值: {best_ucb_value:.3f})")
+        return best_arm
+    
+    def _epsilon_greedy_for_tools(self, arms: List[EnhancedDecisionArm]) -> EnhancedDecisionArm:
+        """针对工具选择的Epsilon-Greedy算法"""
+        if not arms:
+            raise ValueError("没有可用的工具决策臂")
+        
+        # 工具级别的动态epsilon值
+        total_activations = sum(arm.activation_count for arm in arms)
+        epsilon = max(0.05, 0.3 / (1 + total_activations * 0.01))  # 比路径选择更低的探索率
+        
+        logger.debug(f"🔧 Epsilon-Greedy工具选择，ε={epsilon:.3f}")
+        
+        # 使用epsilon决定是否探索
+        if np.random.random() < epsilon:
+            # 探索：随机选择工具
+            selected_arm = np.random.choice(arms)
+            logger.debug(f"🔍 探索模式选择工具: {selected_arm.path_id}")
+            return selected_arm
+        else:
+            # 利用：选择当前最好的工具
+            best_arm = None
+            best_score = -float('inf')
+            
+            for arm in arms:
+                # 工具级别的综合评分
+                score = arm.success_rate
+                
+                # RL奖励权重
+                if arm.rl_reward_history:
+                    avg_reward = sum(arm.rl_reward_history) / len(arm.rl_reward_history)
+                    normalized_reward = max(0, min(1, (avg_reward + 1) / 2))
+                    score = score * 0.5 + normalized_reward * 0.5
+                
+                logger.debug(f"   工具 {arm.path_id}: score={score:.3f}")
+                
+                if score > best_score:
+                    best_score = score
+                    best_arm = arm
+            
+            logger.debug(f"🏆 利用模式选择工具: {best_arm.path_id} (得分: {best_score:.3f})")
+            return best_arm if best_arm else arms[0]
+    
+    # ==================== 📊 更新性能反馈方法 ====================
+    
+    def update_path_performance(self, path_id: str, success: bool, reward: float = 0.0):
+        """
+        🔧 双层学习：更新路径或工具的性能反馈 - 通用性反馈更新方法
+        
+        Args:
+            path_id: 路径ID或工具ID（由调用方决定是路径还是工具）
             success: 执行是否成功
             reward: RL奖励值
         """
-        # 🎯 根源修复：直接使用path_id作为策略ID，数据源头已保证正确性
-        strategy_id = path_id
-        
-        # 🔧 动态创建：确保策略决策臂存在
-        target_arm = self._create_strategy_arm_if_missing(strategy_id)
+        # 🎯 智能识别：检查是路径反馈还是工具反馈
+        if path_id in self.path_arms:
+            # 路径反馈处理
+            target_arm = self.path_arms[path_id]
+            
+            # 更新路径算法性能统计
+            if self.path_selection_history:
+                last_selection = self.path_selection_history[-1]
+                if last_selection['path_id'] == path_id:
+                    algorithm = last_selection['algorithm']
+                    self.algorithm_performance[algorithm]['total'] += 1
+                    if success:
+                        self.algorithm_performance[algorithm]['successes'] += 1
+                        
+        elif path_id in self.tool_arms:
+            # 工具反馈处理
+            target_arm = self.tool_arms[path_id]
+            
+            # 更新工具算法性能统计
+            if self.tool_selection_history:
+                last_selection = self.tool_selection_history[-1]
+                if last_selection['tool_id'] == path_id:
+                    algorithm = last_selection['algorithm']
+                    self.tool_algorithm_performance[algorithm]['total'] += 1
+                    if success:
+                        self.tool_algorithm_performance[algorithm]['successes'] += 1
+                        
+        else:
+            # 动态创建决策臂（默认作为路径处理，保持向后兼容）
+            target_arm = self._create_strategy_arm_if_missing(path_id)
+            logger.debug(f"🔧 为未知ID {path_id} 创建路径决策臂（向后兼容）")
         
         # 使用增强的性能更新方法
         target_arm.update_performance(success, reward)
         
-        # 更新算法性能统计
-        if self.path_selection_history:
-            last_selection = self.path_selection_history[-1]
-            if last_selection['path_id'] == path_id:
-                algorithm = last_selection['algorithm']
-                self.algorithm_performance[algorithm]['total'] += 1
-                if success:
-                    self.algorithm_performance[algorithm]['successes'] += 1
-        
-        logger.info(f"📊 更新策略性能: {strategy_id} -> 成功率:{target_arm.success_rate:.3f}, 奖励:{reward:.3f}")
-        logger.debug(f"   原始path_id: {path_id}")
+        # 记录更新日志
+        arm_type = "工具" if path_id in self.tool_arms else "路径"
+        logger.info(f"📊 更新{arm_type}性能: {path_id} -> 成功率:{target_arm.success_rate:.3f}, 奖励:{reward:.3f}")
         logger.debug(f"   详细: 成功{target_arm.success_count}次, 失败{target_arm.failure_count}次, 激活{target_arm.activation_count}次")
         
-        # 🏆 黄金模板识别逻辑：检查是否符合黄金模板条件
-        self._check_and_promote_to_golden_template(strategy_id, target_arm)
+        # 🏆 黄金模板识别逻辑：检查是否符合黄金模板条件（仅对路径应用）
+        if path_id in self.path_arms:
+            self._check_and_promote_to_golden_template(path_id, target_arm)
     
     # 保留向后兼容的方法（标记为过时）
     def update_arm_performance(self, dimension_name: str, option: str, 
