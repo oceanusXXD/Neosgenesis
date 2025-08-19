@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
@@ -14,8 +14,9 @@ Unified LLM Client Interface - Base classes and data structures for all LLM clie
 
 import time
 import logging
+import asyncio
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Union, Callable, AsyncIterator
+from typing import Dict, List, Optional, Any, Union, Callable, AsyncIterator, Awaitable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -230,6 +231,26 @@ class BaseLLMClient(ABC):
         """
         pass
     
+    @abstractmethod
+    async def achat_completion(self, 
+                              messages: Union[str, List[LLMMessage]], 
+                              temperature: Optional[float] = None,
+                              max_tokens: Optional[int] = None,
+                              **kwargs) -> LLMResponse:
+        """
+        🚀 异步聊天完成接口 - 核心异步抽象方法
+        
+        Args:
+            messages: 消息内容，可以是字符串或消息列表
+            temperature: 温度参数
+            max_tokens: 最大token数
+            **kwargs: 其他参数
+            
+        Returns:
+            LLMResponse: 统一的响应对象
+        """
+        pass
+    
     def call_api(self, prompt: str, 
                  system_message: Optional[str] = None,
                  temperature: Optional[float] = None,
@@ -270,6 +291,44 @@ class BaseLLMClient(ABC):
             return response.content
         else:
             error_msg = f"{self.provider.value} API调用失败: {response.error_message}"
+            logger.error(error_msg)
+            raise ConnectionError(error_msg)
+    
+    async def acall_api(self, prompt: str, 
+                       system_message: Optional[str] = None,
+                       temperature: Optional[float] = None,
+                       **kwargs) -> str:
+        """
+        🚀 异步简化的API调用接口 - 兼容现有代码
+        
+        这个方法为了保持与现有代码的兼容性而存在。
+        内部调用achat_completion方法。
+        
+        Args:
+            prompt: 用户提示
+            system_message: 系统消息
+            temperature: 温度参数
+            **kwargs: 其他参数
+            
+        Returns:
+            str: 响应内容
+            
+        Raises:
+            ConnectionError: 当所有重试都失败时
+        """
+        # 构建消息列表
+        messages = []
+        if system_message:
+            messages.append(LLMMessage(role="system", content=system_message))
+        messages.append(LLMMessage(role="user", content=prompt))
+        
+        # 使用achat_completion执行
+        response = await self.achat_completion(messages, temperature=temperature, **kwargs)
+        
+        if response.success:
+            return response.content
+        else:
+            error_msg = f"{self.provider.value} 异步API调用失败: {response.error_message}"
             logger.error(error_msg)
             raise ConnectionError(error_msg)
     
