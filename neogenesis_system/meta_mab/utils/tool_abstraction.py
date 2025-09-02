@@ -4,12 +4,20 @@
 """
 工具抽象基类 - Tool Abstraction Base Classes
 定义所有工具必须遵守的统一接口，确保系统任何部分都可以用同样的方式与任何工具交互
+
+🔥 核心改造：从"类定义与手动注册"到"函数定义即自动注册"
+- @tool 装饰器：将普通函数自动包装为BaseTool并注册
+- 自动推断函数签名和类型提示  
+- 智能错误处理和结果包装
+- 提供简洁的API，隐藏复杂的内部实现
 """
 
 import logging
 import time
+import inspect
+import functools
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable, get_type_hints
 from dataclasses import dataclass
 from enum import Enum
 
@@ -792,3 +800,338 @@ def health_check() -> Dict[str, Any]:
 def export_registry_config() -> Dict[str, Any]:
     """便捷函数：导出注册表配置"""
     return global_tool_registry.export_registry_config()
+
+
+# ============================================================================
+# 🔥 核心改造：@tool 装饰器系统
+# 从"类定义与手动注册"到"函数定义即自动注册"
+# ============================================================================
+
+class FunctionTool(BaseTool):
+    """
+    函数工具包装类
+    动态将普通函数包装为符合BaseTool接口的工具类
+    
+    这个类是装饰器的核心，它继承BaseTool确保完全兼容现有系统架构
+    """
+    
+    def __init__(self, func: Callable, name: str, description: str, 
+                 category: ToolCategory, capabilities: ToolCapability):
+        """
+        初始化函数工具包装器
+        
+        Args:
+            func: 被包装的原始函数
+            name: 工具名称
+            description: 工具描述  
+            category: 工具类别
+            capabilities: 工具能力描述
+        """
+        super().__init__(name, description, category)
+        self.func = func
+        self._capabilities = capabilities
+        
+        # 保存原始函数的元数据，便于调试和追踪
+        self.original_function = func
+        self.function_name = func.__name__
+        self.module_name = getattr(func, '__module__', 'unknown')
+        self.function_signature = inspect.signature(func)
+        
+        # 缓存类型提示，提高执行效率
+        try:
+            self.type_hints = get_type_hints(func)
+        except Exception as e:
+            logger.warning(f"⚠️ 无法获取函数 {self.function_name} 的类型提示: {e}")
+            self.type_hints = {}
+        
+        logger.debug(f"🔧 函数工具包装器创建完成: {self.name} -> {self.function_name}")
+    
+    @property
+    def capabilities(self) -> ToolCapability:
+        """返回工具能力描述"""
+        return self._capabilities
+    
+    def execute(self, *args, **kwargs) -> ToolResult:
+        """
+        执行被包装的函数
+        
+        这是关键方法：它调用原始函数并将结果统一包装成ToolResult格式
+        
+        Args:
+            *args: 位置参数
+            **kwargs: 关键字参数
+            
+        Returns:
+            ToolResult: 统一的执行结果
+        """
+        start_time = time.time()
+        
+        try:
+            # 更新使用统计和状态
+            self._update_usage_stats()
+            self._set_status(ToolStatus.BUSY)
+            
+            # 验证输入参数（基于函数签名）
+            if not self.validate_input(*args, **kwargs):
+                return ToolResult(
+                    success=False,
+                    error_message="输入参数验证失败",
+                    execution_time=time.time() - start_time
+                )
+            
+            logger.debug(f"🚀 执行函数工具: {self.name}({self.function_name})")
+            
+            # 🎯 核心：执行原始函数
+            result = self.func(*args, **kwargs)
+            
+            # 智能结果处理：如果函数已返回ToolResult则直接使用，否则自动包装
+            if isinstance(result, ToolResult):
+                final_result = result
+                # 更新执行时间
+                final_result.execution_time = time.time() - start_time
+            else:
+                # 自动包装普通返回值为ToolResult
+                final_result = ToolResult(
+                    success=True,
+                    data=result,
+                    execution_time=time.time() - start_time,
+                    metadata={
+                        "function_name": self.function_name,
+                        "module_name": self.module_name,
+                        "tool_name": self.name,
+                        "wrapped_function": True
+                    }
+                )
+            
+            self._set_status(ToolStatus.READY)
+            logger.debug(f"✅ 函数工具执行成功: {self.name}")
+            return final_result
+            
+        except Exception as e:
+            # 统一异常处理，确保系统稳定性
+            self._set_status(ToolStatus.ERROR)
+            logger.error(f"❌ 函数工具执行失败: {self.name} - {e}")
+            return ToolResult(
+                success=False,
+                error_message=f"函数执行异常: {e}",
+                execution_time=time.time() - start_time,
+                metadata={
+                    "function_name": self.function_name,
+                    "module_name": self.module_name,
+                    "tool_name": self.name,
+                    "exception_type": type(e).__name__,
+                    "wrapped_function": True
+                }
+            )
+    
+    def validate_input(self, *args, **kwargs) -> bool:
+        """
+        基于函数签名验证输入参数
+        
+        这个方法利用Python的inspect模块自动验证参数，
+        开发者无需手动编写验证逻辑
+        
+        Args:
+            *args: 位置参数
+            **kwargs: 关键字参数
+            
+        Returns:
+            bool: 输入是否有效
+        """
+        try:
+            # 使用函数签名绑定和验证参数
+            bound = self.function_signature.bind(*args, **kwargs)
+            bound.apply_defaults()
+            return True
+            
+        except TypeError as e:
+            logger.warning(f"⚠️ 函数 {self.function_name} 参数验证失败: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ 函数 {self.function_name} 参数验证异常: {e}")
+            return False
+
+
+def _extract_function_metadata(func: Callable) -> tuple[str, str, ToolCapability]:
+    """
+    自动提取函数元数据
+    
+    这是装饰器的关键功能：自动分析函数并提取所需的工具元数据
+    
+    Args:
+        func: 要分析的函数
+        
+    Returns:
+        tuple: (工具名称, 工具描述, 工具能力)
+    """
+    # 🎯 1. 工具名称：直接使用函数名
+    name = func.__name__
+    
+    # 🎯 2. 工具描述：从文档字符串提取
+    description = func.__doc__ if func.__doc__ else f"函数工具: {name}"
+    # 清理描述文本
+    description = description.strip().replace('\n', ' ').replace('  ', ' ')
+    
+    # 🎯 3. 分析函数能力
+    signature = inspect.signature(func)
+    type_hints = {}
+    try:
+        type_hints = get_type_hints(func)
+    except Exception:
+        pass
+    
+    # 分析输入类型
+    supported_inputs = []
+    for param_name, param in signature.parameters.items():
+        if param_name in type_hints:
+            param_type = type_hints[param_name]
+            # 简化类型名称
+            type_name = getattr(param_type, '__name__', str(param_type))
+            supported_inputs.append(type_name)
+        else:
+            supported_inputs.append("Any")
+    
+    # 分析返回类型  
+    output_types = []
+    if 'return' in type_hints:
+        return_type = type_hints['return']
+        type_name = getattr(return_type, '__name__', str(return_type))
+        output_types.append(type_name)
+    else:
+        output_types.append("Any")
+    
+    # 检测异步支持
+    async_support = inspect.iscoroutinefunction(func)
+    
+    capabilities = ToolCapability(
+        supported_inputs=supported_inputs,
+        output_types=output_types,
+        async_support=async_support,
+        batch_support=False,  # 默认不支持批量处理
+        requires_auth=False,  # 默认不需要认证
+        rate_limited=False    # 默认无速率限制
+    )
+    
+    return name, description, capabilities
+
+
+def tool(category: ToolCategory = ToolCategory.SYSTEM, 
+         name: Optional[str] = None,
+         description: Optional[str] = None,
+         aliases: Optional[List[str]] = None,
+         overwrite: bool = False,
+         auto_register: bool = True,
+         **capability_kwargs) -> Callable:
+    """
+    🔥 核心装饰器：@tool
+    
+    这是整个改造的核心！将普通函数自动转换为工具并注册到系统中。
+    
+    使用方式：
+        @tool(category=ToolCategory.SEARCH)
+        def my_search_tool(query: str) -> dict:
+            '''搜索工具的描述'''
+            return {"results": ["result1", "result2"]}
+    
+    Args:
+        category: 工具类别，默认为SYSTEM
+        name: 自定义工具名称，默认使用函数名  
+        description: 自定义工具描述，默认使用函数文档字符串
+        aliases: 工具别名列表
+        overwrite: 是否覆盖已存在的工具
+        auto_register: 是否自动注册到全局注册表
+        **capability_kwargs: 额外的能力参数
+        
+    Returns:
+        装饰器函数
+    """
+    def decorator(func: Callable) -> Callable:
+        """实际的装饰器函数"""
+        
+        # 🎯 自动提取函数元数据
+        auto_name, auto_description, auto_capabilities = _extract_function_metadata(func)
+        
+        # 使用提供的参数或自动提取的值
+        final_name = name or auto_name
+        final_description = description or auto_description
+        
+        # 合并能力参数
+        capability_dict = {
+            "supported_inputs": auto_capabilities.supported_inputs,
+            "output_types": auto_capabilities.output_types,
+            "async_support": auto_capabilities.async_support,
+            "batch_support": auto_capabilities.batch_support,
+            "requires_auth": auto_capabilities.requires_auth,
+            "rate_limited": auto_capabilities.rate_limited,
+            **capability_kwargs  # 允许覆盖默认值
+        }
+        
+        final_capabilities = ToolCapability(**capability_dict)
+        
+        # 🎯 创建FunctionTool包装器实例
+        tool_instance = FunctionTool(
+            func=func,
+            name=final_name,
+            description=final_description, 
+            category=category,
+            capabilities=final_capabilities
+        )
+        
+        # 🎯 自动注册到全局注册表
+        if auto_register:
+            success = global_tool_registry.register_tool(
+                tool_instance, 
+                aliases=aliases, 
+                overwrite=overwrite
+            )
+            
+            if success:
+                logger.info(f"🎉 工具自动注册成功: {final_name} ({category.value})")
+            else:
+                logger.warning(f"⚠️ 工具注册失败: {final_name}")
+        
+        # 🎯 返回增强后的函数
+        # 添加工具实例作为函数属性，方便访问工具元数据
+        func._tool_instance = tool_instance
+        func._is_tool = True
+        
+        # 保持原函数的调用方式不变，但添加了工具功能
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # 可以直接调用原函数，也可以通过工具系统调用
+            return func(*args, **kwargs)
+        
+        # 复制工具属性到包装函数
+        wrapper._tool_instance = tool_instance
+        wrapper._is_tool = True
+        
+        return wrapper
+    
+    return decorator
+
+
+# 便捷函数：检查函数是否为工具
+def is_tool(func: Callable) -> bool:
+    """
+    检查函数是否被@tool装饰器装饰
+    
+    Args:
+        func: 要检查的函数
+        
+    Returns:
+        bool: 是否为工具函数
+    """
+    return getattr(func, '_is_tool', False)
+
+
+def get_tool_instance(func: Callable) -> Optional[FunctionTool]:
+    """
+    获取函数对应的工具实例
+    
+    Args:
+        func: 工具函数
+        
+    Returns:
+        Optional[FunctionTool]: 工具实例，如果不是工具函数则返回None
+    """
+    return getattr(func, '_tool_instance', None)

@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -71,13 +72,18 @@ from .tool_abstraction import (
     get_tool_info,
     get_registry_stats,
     health_check,
-    export_registry_config
+    export_registry_config,
+    # 🔥 核心改造：@tool 装饰器系统
+    FunctionTool,
+    tool,
+    is_tool,
+    get_tool_instance
 )
 
-# 🔧 新增：搜索工具（Tool接口封装）
+# 🔧 重构后：搜索工具（函数式工具）
 from .search_tools import (
-    WebSearchTool,
-    IdeaVerificationTool,
+    web_search,             # 🔥 新: 函数式搜索工具
+    idea_verification,      # 🔥 新: 函数式验证工具  
     create_and_register_search_tools,
     quick_web_search,
     quick_idea_verification
@@ -136,11 +142,16 @@ __all__ = [
     "get_registry_stats",
     "health_check",
     "export_registry_config",
+    # 🔥 核心改造：@tool 装饰器系统
+    "FunctionTool",
+    "tool",
+    "is_tool",
+    "get_tool_instance",
     
-    # 🔧 新增：搜索工具（Tool接口封装）
-    "WebSearchTool",
-    "IdeaVerificationTool", 
+    # 🔧 重构后：搜索工具（函数式工具）
+    "web_search",           # 🔥 新: 函数式搜索工具
+    "idea_verification",    # 🔥 新: 函数式验证工具
     "create_and_register_search_tools",
-    "quick_web_search",
+    "quick_web_search", 
     "quick_idea_verification"
 ]

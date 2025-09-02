@@ -29,13 +29,14 @@ from .utils.tool_abstraction import (
     get_tool,
     execute_tool,
     search_tools,
+    list_available_tools,  # 🔥 新增：用于检查自动注册的工具
     ToolCategory,
     ToolResult
 )
 from .utils.search_tools import (
-    WebSearchTool,
-    IdeaVerificationTool,
-    create_and_register_search_tools
+    web_search,             # 🔥 重构后: 函数式搜索工具
+    idea_verification,      # 🔥 重构后: 函数式验证工具
+    # 注意：导入模块即可触发@tool装饰器的自动注册，无需手动注册函数
 )
 
 from config import SYSTEM_LIMITS, FEATURE_FLAGS, PROMPT_TEMPLATES, PERFORMANCE_CONFIG
@@ -110,11 +111,16 @@ class MainController:
             # 使用全局工具注册表
             self.tool_registry = global_tool_registry
             
-            # 创建并注册搜索工具
-            tools = create_and_register_search_tools()
+            # 🔥 工具自动注册：通过导入search_tools模块，@tool装饰器已自动注册所有工具
+            # 无需手动调用注册函数，只需确保模块被导入即可
             
-            logger.info(f"🔧 工具注册表初始化完成，已注册 {len(tools)} 个工具")
-            for tool_name in tools:
+            # 获取当前已注册的工具列表
+            available_tools = list_available_tools()
+            search_tools_count = len([t for t in available_tools if t in ['web_search', 'idea_verification']])
+            
+            logger.info(f"🔧 工具注册表初始化完成，已自动注册 {len(available_tools)} 个工具")
+            logger.info(f"   其中搜索相关工具: {search_tools_count} 个")
+            for tool_name in available_tools:
                 logger.debug(f"   - {tool_name}")
                 
         except Exception as e:
