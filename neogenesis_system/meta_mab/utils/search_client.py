@@ -23,10 +23,13 @@ except ImportError:
 
 # 导入配置
 try:
-    from config import RAG_CONFIG
+    from neogenesis_system.config import RAG_CONFIG
 except ImportError:
-    # 默认配置（如果无法导入）
-    RAG_CONFIG = {"enable_real_web_search": False}
+    try:
+        from ...config import RAG_CONFIG
+    except ImportError:
+        # 默认配置（如果无法导入）
+        RAG_CONFIG = {"enable_real_web_search": False}
 
 logger = logging.getLogger(__name__)
 

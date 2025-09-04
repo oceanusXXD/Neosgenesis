@@ -29,7 +29,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .utils.search_client import WebSearchClient, SearchResult, SearchResponse
 # from .utils.client_adapter import DeepSeekClientAdapter  # 不再需要，使用依赖注入
 from .utils.common_utils import parse_json_response
-from config import PROMPT_TEMPLATES, RAG_CONFIG
+try:
+    from neogenesis_system.config import PROMPT_TEMPLATES, RAG_CONFIG
+except ImportError:
+    try:
+        from ..config import PROMPT_TEMPLATES, RAG_CONFIG
+    except ImportError:
+        PROMPT_TEMPLATES = {}
+        RAG_CONFIG = {}
 
 logger = logging.getLogger(__name__)
 

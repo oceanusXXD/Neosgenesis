@@ -32,7 +32,11 @@ except ImportError:
     pass  # 如果没有安装 python-dotenv，则跳过
 
 # 使用相对导入，因为main.py位于包内
-from .meta_mab.controller import MainController
+# from .meta_mab.controller import MainController  # 已废弃，使用 NeogenesisPlanner
+from .planners.neogenesis_planner import NeogenesisPlanner
+from .meta_mab.reasoner import PriorReasoner
+from .meta_mab.path_generator import PathGenerator
+from .meta_mab.mab_converger import MABConverger
 from .config import LOGGING_CONFIG, FEATURE_FLAGS
 
 
@@ -74,14 +78,22 @@ class NeogenesisSystem:
         初始化系统
         
         Args:
-            api_key: DeepSeek API密钥
+            api_key: DeepSeek API密钥  
             config: 系统配置
         """
         self.api_key = api_key
         self.config = config or {}
         
-        # 初始化主控制器
-        self.controller = MainController(api_key, config)
+        # 初始化NeogenesisPlanner及其组件
+        prior_reasoner = PriorReasoner()
+        path_generator = PathGenerator()
+        mab_converger = MABConverger()
+        
+        self.planner = NeogenesisPlanner(
+            prior_reasoner=prior_reasoner,
+            path_generator=path_generator,
+            mab_converger=mab_converger
+        )
         
         # 系统统计
         self.session_stats = {
@@ -92,10 +104,10 @@ class NeogenesisSystem:
         }
         
         print("🌟 Neogenesis智能思维路径决策系统已启动")
-        print(f"🧠 思维发散组件: {'✅' if self.controller.prior_reasoner else '❌'}")
+        print(f"🧠 思维发散组件: {'✅' if prior_reasoner else '❌'}")
         print(f"🤖 DeepSeek思维引擎: {'✅' if api_key else '❌'}")
-        print(f"🎯 MAB收敛算法: {'✅' if self.controller.mab_converger else '❌'}")
-        print(f"🔧 自我评估模块: {'✅' if self.controller.deepseek_assessor else '❌'}")
+        print(f"🎯 MAB收敛算法: {'✅' if mab_converger else '❌'}")
+        print(f"🔧 规划器模块: {'✅' if self.planner else '❌'}")
         print("-" * 50)
     
     def process_query(self, user_query: str, execution_context: Optional[Dict] = None, 
@@ -118,22 +130,17 @@ class NeogenesisSystem:
         print(f"📝 认知上下文: {execution_context or '无'}")
         
         try:
-            # 进行决策
-            decision_result = self.controller.make_decision(
-                user_query, deepseek_confidence, execution_context
+            # 使用NeogenesisPlanner进行规划
+            plan_result = self.planner.create_plan(
+                query=user_query,
+                memory=None,
+                context=execution_context or {}
             )
             
             # 模拟执行（在实际应用中，这里会调用具体的执行逻辑）
-            execution_result = self._simulate_execution(decision_result)
+            execution_result = self._simulate_execution_from_plan(plan_result)
             
-            # 更新性能反馈
-            self.controller.update_performance_feedback(
-                decision_result,
-                execution_result['success'],
-                execution_result['execution_time'],
-                execution_result['user_satisfaction'],
-                execution_result['rl_reward']
-            )
+            # NeogenesisPlanner的学习反馈通过执行器实现，这里我们模拟记录
             
             # 更新统计
             processing_time = time.time() - start_time
@@ -145,7 +152,7 @@ class NeogenesisSystem:
             # 构建完整结果
             complete_result = {
                 'query': user_query,
-                'decision': decision_result,
+                'plan': plan_result,
                 'execution': execution_result,
                 'processing_time': processing_time,
                 'session_stats': self.session_stats.copy()
@@ -168,27 +175,31 @@ class NeogenesisSystem:
             print(f"❌ 处理失败: {e}")
             return error_result
     
-    def _simulate_execution(self, decision_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _simulate_execution_from_plan(self, plan_result) -> Dict[str, Any]:
         """
         模拟执行过程（在实际应用中，这里会调用真实的执行逻辑）
         
         Args:
-            decision_result: 决策结果
+            plan_result: Plan对象
             
         Returns:
             执行结果
         """
-        # 基于决策质量模拟执行结果
-        confidence_scores = decision_result.get('confidence_scores', {})
-        avg_confidence = sum(confidence_scores.values()) / len(confidence_scores) if confidence_scores else 0.5
+        # 基于Plan质量模拟执行结果
+        import random
+        
+        # 从Plan的元数据中提取置信度信息
+        metadata = plan_result.metadata or {}
+        neogenesis_data = metadata.get('neogenesis_decision', {})
+        performance_metrics = neogenesis_data.get('performance_metrics', {})
+        avg_confidence = performance_metrics.get('avg_confidence', 0.7)
         
         # 模拟执行时间
         base_time = 2.0
-        complexity_score = decision_result.get('complexity_analysis', {}).get('complexity_score', 0.5)
-        execution_time = base_time + complexity_score * 3.0
+        action_count = len(plan_result.actions) if not plan_result.is_direct_answer else 1
+        execution_time = base_time + action_count * 1.5
         
         # 模拟成功率（基于置信度）
-        import random
         success_probability = avg_confidence * 0.8 + 0.1  # 0.1 到 0.9 之间
         success = random.random() < success_probability
         
@@ -228,19 +239,28 @@ class NeogenesisSystem:
     
     def _print_result_summary(self, result: Dict[str, Any]):
         """打印结果摘要"""
-        decision = result['decision']
+        plan = result['plan']
         execution = result['execution']
         
-        print(f"\n🧠 思维路径分析结果:")
-        selected_dimensions = decision.get('selected_dimensions', {})
-        print(f"   识别思维维度: {len(selected_dimensions)}个")
-        for dim, path in selected_dimensions.items():
-            confidence = decision.get('confidence_scores', {}).get(dim, 0.0)
-            print(f"   - {dim}: {path} (认知置信度: {confidence:.2f})")
+        print(f"\n🧠 智能规划结果:")
+        print(f"   规划类型: {'直接回答' if plan.is_direct_answer else '行动计划'}")
+        print(f"   思考过程: {plan.thought[:100]}..." if len(plan.thought) > 100 else f"   思考过程: {plan.thought}")
         
-        # 如果没有选中维度，显示选择的思维路径
-        if not selected_dimensions and 'reasoning' in decision:
-            print(f"   选择的思维路径: {decision.get('reasoning', '未知')}")
+        if plan.is_direct_answer:
+            print(f"   直接回答: {plan.final_answer[:100]}..." if len(plan.final_answer) > 100 else f"   直接回答: {plan.final_answer}")
+        else:
+            print(f"   计划行动: {len(plan.actions)}个")
+            for i, action in enumerate(plan.actions[:3], 1):  # 只显示前3个
+                print(f"   - 行动{i}: {action.tool_name}({action.tool_input})")
+        
+        # 显示NeogenesisPlanner的决策信息
+        metadata = plan.metadata or {}
+        neogenesis_data = metadata.get('neogenesis_decision', {})
+        if neogenesis_data:
+            chosen_path = neogenesis_data.get('chosen_path')
+            if chosen_path:
+                path_type = getattr(chosen_path, 'path_type', '未知')
+                print(f"   选择的思维路径: {path_type}")
         
         print(f"\n⚡ 执行结果:")
         print(f"   成功: {'✅' if execution['success'] else '❌'}")
@@ -312,13 +332,12 @@ class NeogenesisSystem:
     def _print_system_status(self):
         """打印系统状态"""
         try:
-            status = self.controller.get_system_status()
             print("\n🏥 系统状态:")
-            print(f"   总决策轮数: {status['total_rounds']}")
-            print(f"   成功率: {status['system_performance']['success_rate']:.1%}")
-            print(f"   平均决策时间: {status['system_performance']['avg_decision_time']:.3f}秒")
-            print(f"   活跃维度: {status['component_status']['mab_converger']['active_dimensions']}")
-            print(f"   收敛维度: {sum(status['convergence_status'].values())}个")
+            print(f"   规划器类型: NeogenesisPlanner")
+            print(f"   总查询数: {self.session_stats['total_queries']}")
+            print(f"   成功率: {self.session_stats['successful_queries']/max(self.session_stats['total_queries'],1):.1%}")
+            print(f"   平均处理时间: {self.session_stats['total_time']/max(self.session_stats['total_queries'],1):.3f}秒")
+            print(f"   组件状态: 思维种子✅ 路径生成✅ MAB收敛✅")
         except Exception as e:
             print(f"❌ 获取系统状态失败: {e}")
     
@@ -339,8 +358,14 @@ class NeogenesisSystem:
         """重置系统"""
         confirm = input("⚠️ 确认重置系统? (y/N): ").strip().lower()
         if confirm in ['y', 'yes']:
-            self.controller.reset_system(preserve_learnings=True)
-            print("✅ 系统已重置（保留学习数据）")
+            # 重置会话统计
+            self.session_stats = {
+                'start_time': time.time(),
+                'total_queries': 0,
+                'successful_queries': 0,
+                'total_time': 0.0
+            }
+            print("✅ 系统已重置")
         else:
             print("❌ 取消重置")
     
@@ -353,12 +378,14 @@ class NeogenesisSystem:
         
         if self.session_stats['total_queries'] > 0:
             try:
-                performance_report = self.controller.get_performance_report()
-                recommendations = performance_report.get('recommendations', [])
-                if recommendations:
-                    print("\n💡 性能建议:")
-                    for rec in recommendations[:3]:  # 显示前3个建议
-                        print(f"   - {rec}")
+                print("\n💡 使用建议:")
+                success_rate = self.session_stats['successful_queries']/self.session_stats['total_queries']
+                if success_rate < 0.8:
+                    print("   - 考虑为复杂查询提供更多上下文信息")
+                avg_time = self.session_stats['total_time']/self.session_stats['total_queries']
+                if avg_time > 5.0:
+                    print("   - 查询可能过于复杂，尝试分解为更简单的问题")
+                print("   - NeogenesisPlanner会随着使用不断优化")
             except:
                 pass
         

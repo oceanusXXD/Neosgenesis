@@ -15,10 +15,24 @@ from collections import defaultdict
 
 from .llm_base import BaseLLMClient, LLMConfig, LLMProvider, LLMResponse, LLMMessage
 from .providers import create_llm_client, get_available_providers, is_provider_available
-from config import (
-    LLM_PROVIDERS_CONFIG, DEFAULT_LLM_CONFIG, LLM_MANAGER_CONFIG, 
-    COST_CONTROL_CONFIG, FEATURE_FLAGS
-)
+try:
+    from neogenesis_system.config import (
+        LLM_PROVIDERS_CONFIG, DEFAULT_LLM_CONFIG, LLM_MANAGER_CONFIG, 
+        COST_CONTROL_CONFIG, FEATURE_FLAGS
+    )
+except ImportError:
+    try:
+        from ..config import (
+            LLM_PROVIDERS_CONFIG, DEFAULT_LLM_CONFIG, LLM_MANAGER_CONFIG, 
+            COST_CONTROL_CONFIG, FEATURE_FLAGS
+        )
+    except ImportError:
+        # 提供默认配置
+        LLM_PROVIDERS_CONFIG = {}
+        DEFAULT_LLM_CONFIG = {}
+        LLM_MANAGER_CONFIG = {}
+        COST_CONTROL_CONFIG = {}
+        FEATURE_FLAGS = {}
 
 logger = logging.getLogger(__name__)
 

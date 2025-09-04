@@ -14,7 +14,13 @@ from typing import Optional, Union
 
 from .deepseek_client import DeepSeekClient, ClientConfig, create_llm_client
 from ..llm_base import BaseLLMClient, LLMConfig, LLMProvider
-from config import API_CONFIG
+try:
+    from neogenesis_system.config import API_CONFIG
+except ImportError:
+    try:
+        from ...config import API_CONFIG
+    except ImportError:
+        API_CONFIG = {}
 
 logger = logging.getLogger(__name__)
 

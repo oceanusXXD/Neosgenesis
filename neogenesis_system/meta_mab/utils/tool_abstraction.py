@@ -390,6 +390,18 @@ class ToolRegistry:
         logger.info(f"🗑️ 工具注销成功: {real_name}")
         return True
     
+    def has_tool(self, name: str) -> bool:
+        """
+        检查工具是否存在
+        
+        Args:
+            name: 工具名称或别名
+            
+        Returns:
+            bool: 工具是否存在
+        """
+        return self._resolve_tool_name(name) is not None
+    
     def get_tool(self, name: str, enable_if_disabled: bool = False) -> Optional[BaseTool]:
         """
         获取指定名称的工具

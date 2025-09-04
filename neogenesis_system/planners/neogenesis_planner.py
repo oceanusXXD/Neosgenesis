@@ -102,7 +102,11 @@ class NeogenesisPlanner(BasePlanner):
         
         logger.info(f"🧠 NeogenesisPlanner 初始化完成")
         logger.info(f"   组件: PriorReasoner, PathGenerator, MABConverger")
-        logger.info(f"   工具注册表: {len(self.tool_registry.tools) if self.tool_registry else 0} 个工具")
+        try:
+            tool_count = len(self.tool_registry.tools) if hasattr(self.tool_registry, 'tools') else len(getattr(self.tool_registry, '_tools', {}))
+            logger.info(f"   工具注册表: {tool_count} 个工具")
+        except:
+            logger.info(f"   工具注册表: 已初始化")
     
     def create_plan(self, query: str, memory: Any, context: Optional[Dict[str, Any]] = None) -> Plan:
         """
@@ -577,7 +581,7 @@ class NeogenesisPlanner(BasePlanner):
         """
         try:
             if self.tool_registry and self.tool_registry.has_tool("idea_verification"):
-                result = execute_tool("idea_verification", {"idea_text": idea_text})
+                result = execute_tool("idea_verification", idea_text=idea_text)
                 if result.success:
                     return result.data
             

@@ -15,7 +15,7 @@ Core components for the intelligent decision-making system
 """
 
 # 导入核心组件
-from .controller import MainController
+# from .controller import MainController  # 已废弃，使用 NeogenesisPlanner
 from .reasoner import PriorReasoner
 from .path_generator import PathGenerator, LLMDrivenDimensionCreator
 from .mab_converger import MABConverger
@@ -46,7 +46,7 @@ from .utils.common_utils import parse_json_response
 
 __all__ = [
     # 核心组件
-    "MainController",
+    # "MainController",  # 已废弃，使用 NeogenesisPlanner
     "PriorReasoner",
     "PathGenerator", 
     "LLMDrivenDimensionCreator",

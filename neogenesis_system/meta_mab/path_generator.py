@@ -24,7 +24,13 @@ from dataclasses import dataclass
 from .data_structures import ReasoningPath, TaskComplexity
 # from .utils.client_adapter import DeepSeekClientAdapter  # 不再需要，使用依赖注入
 from .utils.common_utils import parse_json_response, extract_context_factors
-from config import PROMPT_TEMPLATES
+try:
+    from neogenesis_system.config import PROMPT_TEMPLATES
+except ImportError:
+    try:
+        from ..config import PROMPT_TEMPLATES
+    except ImportError:
+        PROMPT_TEMPLATES = {}
 
 logger = logging.getLogger(__name__)
 

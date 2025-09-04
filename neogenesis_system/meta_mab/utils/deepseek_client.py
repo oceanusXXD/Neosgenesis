@@ -34,7 +34,16 @@ except ImportError:
     HTTPX_AVAILABLE = False
     httpx = None
 
-from config import API_CONFIG, DEEPSEEK_CHAT_ENDPOINT, DEEPSEEK_MODEL
+try:
+    from neogenesis_system.config import API_CONFIG, DEEPSEEK_CHAT_ENDPOINT, DEEPSEEK_MODEL
+except ImportError:
+    try:
+        from ...config import API_CONFIG, DEEPSEEK_CHAT_ENDPOINT, DEEPSEEK_MODEL
+    except ImportError:
+        # 提供默认值以防配置文件不存在
+        API_CONFIG = {}
+        DEEPSEEK_CHAT_ENDPOINT = "https://api.deepseek.com/chat/completions"
+        DEEPSEEK_MODEL = "deepseek-chat"
 from ..llm_base import (
     BaseLLMClient, LLMConfig, LLMResponse, LLMMessage, LLMUsage, 
     LLMProvider, LLMErrorType, create_error_response
@@ -255,11 +264,22 @@ class DeepSeekClient(BaseLLMClient):
                 'limits': httpx.Limits(max_keepalive_connections=10, max_connections=100)
             }
             
+            # 处理代理配置 - 使用更兼容的方式
             if self.config.proxies:
-                client_kwargs['proxies'] = self.config.proxies
-            
-            self.async_client = httpx.AsyncClient(**client_kwargs)
-            logger.debug("🚀 异步HTTP客户端初始化完成")
+                try:
+                    # 尝试新的httpx方式
+                    client_kwargs['proxies'] = self.config.proxies
+                    self.async_client = httpx.AsyncClient(**client_kwargs)
+                    logger.debug("🚀 异步HTTP客户端初始化完成（含代理配置）")
+                except TypeError as te:
+                    # 如果失败，则不使用代理创建客户端
+                    logger.warning(f"⚠️ httpx版本不支持proxies参数，跳过代理配置: {te}")
+                    client_kwargs.pop('proxies', None)
+                    self.async_client = httpx.AsyncClient(**client_kwargs)
+                    logger.debug("🚀 异步HTTP客户端初始化完成（无代理）")
+            else:
+                self.async_client = httpx.AsyncClient(**client_kwargs)
+                logger.debug("🚀 异步HTTP客户端初始化完成")
             
         except Exception as e:
             logger.error(f"❌ 异步客户端初始化失败: {e}")

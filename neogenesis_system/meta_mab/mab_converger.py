@@ -16,7 +16,16 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from .data_structures import EnhancedDecisionArm, ReasoningPath
-from config import MAB_CONFIG
+try:
+    from neogenesis_system.config import MAB_CONFIG
+except ImportError:
+    try:
+        from ..config import MAB_CONFIG
+    except ImportError:
+        MAB_CONFIG = {
+            "convergence_threshold": 0.95,
+            "min_samples": 10
+        }
 
 logger = logging.getLogger(__name__)
 

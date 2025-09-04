@@ -19,8 +19,12 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from meta_mab.controller import MainController
-from meta_mab.data_structures import ReasoningPath
+from neogenesis_system.planners.neogenesis_planner import NeogenesisPlanner
+from neogenesis_system.meta_mab.reasoner import PriorReasoner
+from neogenesis_system.meta_mab.path_generator import PathGenerator
+from neogenesis_system.meta_mab.mab_converger import MABConverger
+from neogenesis_system.meta_mab.data_structures import ReasoningPath
+from neogenesis_system.data_structures import Plan, Action
 
 # 配置日志以捕获详细的思考过程
 logging.basicConfig(
@@ -206,7 +210,7 @@ class AIExpertDemo:
     
     def __init__(self):
         self.visualizer = AIThinkingVisualizer()
-        self.controller = None
+        self.planner = None
         self.demo_scenarios = [
             {
                 'name': '标准元认知决策',
@@ -272,23 +276,43 @@ class AIExpertDemo:
             print("✅ DeepSeek API密钥已配置")
         
         try:
-            self.controller = MainController(api_key=api_key)
-            print("✅ 主控制器初始化完成")
+            # 创建NeogenesisPlanner所需的依赖组件
+            prior_reasoner = PriorReasoner(api_key)
+            
+            # 为了向后兼容，创建简单的LLM客户端
+            llm_client = None
+            if api_key:
+                try:
+                    from neogenesis_system.meta_mab.utils.client_adapter import DeepSeekClientAdapter
+                    llm_client = DeepSeekClientAdapter(api_key)
+                except ImportError:
+                    pass
+            
+            path_generator = PathGenerator(api_key, llm_client=llm_client)
+            mab_converger = MABConverger()
+            
+            # 创建NeogenesisPlanner实例
+            self.planner = NeogenesisPlanner(
+                prior_reasoner=prior_reasoner,
+                path_generator=path_generator,
+                mab_converger=mab_converger
+            )
+            print("✅ Neogenesis规划器初始化完成")
             print("✅ 多臂老虎机学习系统已就绪")
             print("✅ 五阶段决策流程已激活")
-            print("✅ 黄金模板系统已启用")
+            print("✅ 新架构规划器已启用")
             
             # 显示系统状态
-            status = self.controller.get_system_status()
+            planner_stats = self.planner.get_stats()
             print(f"\n📊 **系统状态**:")
-            print(f"   🎰 MAB收敛器: {status.get('component_status', {}).get('stage3_mab_converger', {}).get('total_paths', 0)} 条路径")
-            print(f"   🏆 黄金模板: {status.get('golden_template_system', {}).get('total_templates', 0)} 个模板")
-            print(f"   📈 历史决策: {status.get('total_rounds', 0)} 轮")
+            print(f"   🎰 规划器组件: {', '.join(planner_stats.get('components', {}).values())}")
+            print(f"   📈 历史决策: {planner_stats.get('total_rounds', 0)} 轮")
+            print(f"   ⏱️ 平均耗时: {planner_stats.get('performance_stats', {}).get('avg_decision_time', 0):.2f}s")
             
         except Exception as e:
             print(f"❌ 系统初始化失败: {e}")
             print("🔄 将使用模拟模式继续演示...")
-            self.controller = None
+            self.planner = None
         
         self.visualizer.pause_for_observation()
     
@@ -307,7 +331,7 @@ class AIExpertDemo:
         
         self.visualizer.pause_for_observation("准备好观察AI的思考过程了吗？按 Enter 开始...")
         
-        if self.controller:
+        if self.planner:
             self.run_real_scenario(scenario)
         else:
             self.run_simulated_scenario(scenario)
@@ -323,55 +347,61 @@ class AIExpertDemo:
         logger.setLevel(logging.INFO)
         
         try:
-            # 调用决策系统
+            # 调用规划系统
             print("\n🚀 AI开始思考...")
-            result = self.controller.make_decision(
-                user_query=query,
-                deepseek_confidence=0.6,
-                execution_context={'scenario': scenario['name']}
+            plan_result = self.planner.create_plan(
+                query=query,
+                memory=None,  # 演示模式不需要memory
+                context={'scenario': scenario['name'], 'confidence': 0.6}
             )
+            
+            # 从Plan对象的metadata中提取原始决策信息
+            decision_data = plan_result.metadata.get('neogenesis_decision', {})
             
             # 可视化决策过程
             self.visualizer.visualize_thinking_seed({
-                'thinking_seed': result.get('thinking_seed', ''),
-                'task_confidence': result.get('task_confidence', 0.5),
-                'complexity_analysis': result.get('complexity_analysis', {})
+                'thinking_seed': decision_data.get('thinking_seed', ''),
+                'task_confidence': decision_data.get('task_confidence', 0.5),
+                'complexity_analysis': decision_data.get('complexity_analysis', {})
             })
             
             self.visualizer.pause_for_observation()
             
             self.visualizer.visualize_path_generation({
-                'available_paths': result.get('available_paths', [])
+                'available_paths': decision_data.get('available_paths', [])
             })
             
             self.visualizer.pause_for_observation()
             
             self.visualizer.visualize_path_selection({
-                'chosen_path': result.get('chosen_path'),
-                'mab_decision': result.get('mab_decision', {})
+                'chosen_path': decision_data.get('chosen_path'),
+                'mab_decision': decision_data.get('mab_decision', {})
             })
             
             self.visualizer.pause_for_observation()
             
-            if 'verification_stats' in result:
+            if 'verification_stats' in decision_data:
                 self.visualizer.visualize_verification({
-                    'verification_stats': result.get('verification_stats', {}),
-                    'verified_paths': result.get('verified_paths', [])
+                    'verification_stats': decision_data.get('verification_stats', {}),
+                    'verified_paths': decision_data.get('verified_paths', [])
                 })
                 
                 self.visualizer.pause_for_observation()
             
-            self.visualizer.visualize_final_decision(result)
+            self.visualizer.visualize_final_decision(decision_data)
             
-            # 模拟反馈学习
-            print("\n🔄 模拟执行结果反馈...")
-            success = True  # 模拟成功
-            self.controller.update_performance_feedback(
-                result, success, execution_time=2.5, 
-                user_satisfaction=0.9, rl_reward=0.8
-            )
+            # 展示Plan结果
+            print("\n🎯 **规划结果**:")
+            print(f"💭 思考过程: {plan_result.thought}")
             
-            print("✅ 经验已积累到知识库中！")
+            if plan_result.is_direct_answer:
+                print(f"💬 直接回答: {plan_result.final_answer}")
+            else:
+                print(f"🔧 计划行动: {len(plan_result.actions)} 个")
+                for i, action in enumerate(plan_result.actions, 1):
+                    print(f"   {i}. {action.tool_name}: {action.tool_input}")
+            
+            print("✅ 规划过程完成！")
             
         except Exception as e:
             print(f"❌ 演示过程中出现错误: {e}")
@@ -478,16 +508,21 @@ class AIExpertDemo:
         """显示学习总结"""
         self.visualizer.print_header("🎓 AI学习与成长总结", "📚")
         
-        if self.controller:
-            status = self.controller.get_system_status()
-            mab_status = status.get('component_status', {}).get('stage3_mab_converger', {})
-            golden_status = status.get('golden_template_system', {})
+        if self.planner:
+            planner_stats = self.planner.get_stats()
+            performance_stats = planner_stats.get('performance_stats', {})
             
             print("📊 **学习成果统计**:")
-            print(f"   🎰 路径选择经验: {mab_status.get('total_selections', 0)} 次")
-            print(f"   🏆 黄金模板数量: {golden_status.get('total_templates', 0)} 个")
-            print(f"   📈 决策轮次: {status.get('total_rounds', 0)} 轮")
-            print(f"   🎯 系统收敛度: {mab_status.get('convergence_level', 0):.2%}")
+            print(f"   🎯 总决策次数: {performance_stats.get('total_decisions', 0)} 次")
+            print(f"   ⏱️ 平均决策时间: {performance_stats.get('avg_decision_time', 0):.2f}s")
+            print(f"   📈 历史轮次: {planner_stats.get('total_rounds', 0)} 轮")
+            
+            # 组件性能统计
+            component_perf = performance_stats.get('component_performance', {})
+            for comp_name, comp_stats in component_perf.items():
+                calls = comp_stats.get('calls', 0)
+                avg_time = comp_stats.get('avg_time', 0)
+                print(f"   🔧 {comp_name}: {calls} 次调用, 平均耗时 {avg_time:.3f}s")
         
         print(f"""
 ✨ **AI的自我反思**:

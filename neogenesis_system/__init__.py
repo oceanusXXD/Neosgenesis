@@ -17,7 +17,7 @@ __author__ = "Neogenesis Team"
 __email__ = "team@neogenesis.ai"
 
 # 导入核心组件
-from .meta_mab.controller import MainController
+# from .meta_mab.controller import MainController  # 已废弃，使用 NeogenesisPlanner
 from .meta_mab.reasoner import PriorReasoner
 from .meta_mab.path_generator import PathGenerator, LLMDrivenDimensionCreator
 from .meta_mab.mab_converger import MABConverger
@@ -76,7 +76,7 @@ from .config import (
 
 __all__ = [
     # 核心组件
-    "MainController",
+    # "MainController",  # 已废弃，使用 NeogenesisPlanner
     "PriorReasoner", 
     "PathGenerator",
     "LLMDrivenDimensionCreator",
@@ -128,23 +128,38 @@ __all__ = [
 ]
 
 
-def create_system(api_key: str, config: dict = None) -> MainController:
+def create_system(api_key: str = None, config: dict = None):
     """
     创建Neogenesis智能决策系统实例
     
     Args:
-        api_key: DeepSeek API密钥
+        api_key: DeepSeek API密钥（可选，用于完整功能）
         config: 系统配置字典
         
     Returns:
-        MainController实例
+        NeogenesisPlanner实例
         
     Example:
-        >>> system = create_system("your_api_key")
-        >>> result = system.make_decision("查询最近上映的电影")
-        >>> print(result['selected_dimensions'])
+        >>> from neogenesis_system.planners import NeogenesisPlanner
+        >>> planner = create_system()
+        >>> plan = planner.create_plan("查询最近上映的电影")
+        >>> print(plan.actions)
     """
-    return MainController(api_key, config)
+    from .planners.neogenesis_planner import NeogenesisPlanner
+    from .meta_mab.reasoner import PriorReasoner
+    from .meta_mab.path_generator import PathGenerator
+    from .meta_mab.mab_converger import MABConverger
+    
+    # 创建组件
+    prior_reasoner = PriorReasoner()
+    path_generator = PathGenerator()
+    mab_converger = MABConverger()
+    
+    return NeogenesisPlanner(
+        prior_reasoner=prior_reasoner,
+        path_generator=path_generator,
+        mab_converger=mab_converger
+    )
 
 
 def get_version() -> str:
@@ -160,7 +175,7 @@ def get_system_info() -> dict:
         "description": "智能决策系统 - LLM驱动的多臂老虎机决策框架",
         "author": __author__,
         "components": [
-            "MainController",
+            "NeogenesisPlanner",
             "PriorReasoner", 
             "PathGenerator",
             "MABConverger"

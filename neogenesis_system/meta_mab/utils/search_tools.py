@@ -123,7 +123,7 @@ def idea_verification(idea_text: str) -> Dict[str, Any]:
     # 🎯 核心逻辑：调用验证客户端
     web_search_client = WebSearchClient(search_engine="duckduckgo", max_results=5)
     verification_client = IdeaVerificationSearchClient(web_search_client)
-    verification_result = verification_client.verify_idea(idea_text)
+    verification_result = verification_client.verify_idea_feasibility(idea_text)
     
     if not verification_result.success:
         raise RuntimeError(f"想法验证失败: {verification_result.error_message}")
