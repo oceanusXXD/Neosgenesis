@@ -1104,26 +1104,6 @@ Neogenesis System is independently developed by the author.
 
 - **📧 Email Contact**: This project is still in development. If you're interested in the project or need commercial use, please contact: answeryt@qq.com
 
-### Roadmap
-
-#### LangChain Integration Roadmap
-- **v1.1**: Enhanced LangChain tool ecosystem with database, API, and file operation tools; improved chain discovery algorithms
-- **v1.2**: Advanced chain composition and parallel execution capabilities; LangChain performance analytics and monitoring
-- **v1.3**: Visual chain execution flows and distributed state management Web interface; LangChain marketplace integration
-- **v1.4**: Multi-language LangChain support, internationalization deployment, and enterprise LangChain connectors
-- **v2.0**: Distributed chain execution, enterprise-level LangChain integration, and custom chain marketplace
-
-#### Core System Roadmap  
-- **v1.1**: Enhanced tool ecosystem with database, API, and file operation tools; improved tool discovery algorithms
-- **v1.2**: Advanced tool composition and chaining capabilities; tool performance analytics
-- **v1.3**: Visual tool execution flows and decision-making process Web interface
-- **v1.4**: Multi-language support, internationalization deployment
-- **v2.0**: Distributed tool execution, enterprise-level integration, and custom tool marketplace
-
----
-
-<div align="center">
-
 **🌟 If this project helps you, please give us a Star!**
 
 [![GitHub stars](https://img.shields.io/github/stars/your-repo/neogenesis-system.svg?style=social&label=Star)](../../stargazers)
