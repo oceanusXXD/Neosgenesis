@@ -15,7 +15,7 @@ import logging
 from typing import Dict, Any
 
 # 导入重构后的搜索工具
-from meta_mab.utils.search_tools import (
+from providers.search_tools import (
     web_search,
     idea_verification,
     create_and_register_search_tools,
@@ -24,7 +24,7 @@ from meta_mab.utils.search_tools import (
 )
 
 # 导入工具系统接口
-from meta_mab.utils import (
+from tools.tool_abstraction import (
     list_available_tools, 
     execute_tool, 
     get_tool_info,

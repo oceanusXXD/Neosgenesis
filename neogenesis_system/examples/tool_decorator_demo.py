@@ -17,7 +17,7 @@ import logging
 from typing import Dict, List, Optional
 
 # 导入装饰器系统
-from meta_mab.utils import (
+from tools.tool_abstraction import (
     tool, ToolCategory, ToolResult,
     list_available_tools, execute_tool, get_tool_info,
     is_tool, get_tool_instance

@@ -31,7 +31,7 @@ def demonstrate_complete_transformation():
     
     try:
         # 导入装饰器系统
-        from meta_mab.utils import tool, ToolCategory, FunctionTool, is_tool, get_tool_instance
+        from tools.tool_abstraction import tool, ToolCategory, FunctionTool, is_tool, get_tool_instance
         print("✅ @tool 装饰器系统导入成功")
         
         # 展示装饰器使用
@@ -58,8 +58,8 @@ def demonstrate_complete_transformation():
     
     try:
         # 导入重构后的搜索工具
-        from meta_mab.utils.search_tools import web_search, idea_verification
-        from meta_mab.utils import list_available_tools
+        from providers.search_tools import web_search, idea_verification
+        from tools.tool_abstraction import list_available_tools
         
         print("✅ 重构后的搜索工具导入成功")
         
@@ -85,7 +85,7 @@ def demonstrate_complete_transformation():
     
     try:
         # 验证自动注册机制
-        from meta_mab.utils.search_tools import create_and_register_search_tools
+        from providers.search_tools import create_and_register_search_tools
         
         print("✅ 手动注册调用已从控制器中移除")
         print("✅ 模块导入即触发自动注册机制")

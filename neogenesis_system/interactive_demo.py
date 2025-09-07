@@ -19,12 +19,12 @@ from datetime import datetime
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from neogenesis_system.planners.neogenesis_planner import NeogenesisPlanner
-from neogenesis_system.meta_mab.reasoner import PriorReasoner
-from neogenesis_system.meta_mab.path_generator import PathGenerator
-from neogenesis_system.meta_mab.mab_converger import MABConverger
-from neogenesis_system.meta_mab.data_structures import ReasoningPath
-from neogenesis_system.data_structures import Plan, Action
+from neogenesis_system.core.neogenesis_planner import NeogenesisPlanner
+from neogenesis_system.cognitive_engine.reasoner import PriorReasoner
+from neogenesis_system.cognitive_engine.path_generator import PathGenerator
+from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+from neogenesis_system.cognitive_engine.data_structures import ReasoningPath
+from neogenesis_system.shared.data_structures import Plan, Action
 
 # 配置日志以捕获详细的思考过程
 logging.basicConfig(
@@ -283,7 +283,7 @@ class AIExpertDemo:
             llm_client = None
             if api_key:
                 try:
-                    from neogenesis_system.meta_mab.utils.client_adapter import DeepSeekClientAdapter
+                    from neogenesis_system.providers.client_adapter import DeepSeekClientAdapter
                     llm_client = DeepSeekClientAdapter(api_key)
                 except ImportError:
                     pass
@@ -342,7 +342,7 @@ class AIExpertDemo:
         
         # 创建自定义的日志处理器来捕获思考过程
         thinking_handler = ThinkingLogHandler(self.visualizer)
-        logger = logging.getLogger('meta_mab')
+        logger = logging.getLogger('cognitive_engine')
         logger.addHandler(thinking_handler)
         logger.setLevel(logging.INFO)
         

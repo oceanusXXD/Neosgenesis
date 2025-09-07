@@ -30,11 +30,11 @@ try:
     )
     
     # 导入 NeogenesisPlanner 及其依赖
-    from neogenesis_system.planners.neogenesis_planner import NeogenesisPlanner
-    from neogenesis_system.meta_mab.reasoner import PriorReasoner
-    from neogenesis_system.meta_mab.path_generator import PathGenerator
-    from neogenesis_system.meta_mab.mab_converger import MABConverger
-    from neogenesis_system.meta_mab.utils.tool_abstraction import (
+    from neogenesis_system.core.neogenesis_planner import NeogenesisPlanner
+    from neogenesis_system.cognitive_engine.reasoner import PriorReasoner
+    from neogenesis_system.cognitive_engine.path_generator import PathGenerator
+    from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+    from neogenesis_system.tools.tool_abstraction import (
         global_tool_registry, execute_tool, ToolResult
     )
     
@@ -71,7 +71,7 @@ class NeogenesisPlannerFactory:
         llm_client = None
         if api_key:
             try:
-                from neogenesis_system.meta_mab.utils.client_adapter import DeepSeekClientAdapter
+                from neogenesis_system.providers.client_adapter import DeepSeekClientAdapter
                 llm_client = DeepSeekClientAdapter(api_key)
                 print("✅ LLM客户端创建成功")
             except Exception as e:

@@ -6,16 +6,16 @@
 定义框架中所有核心组件的抽象基类，确保模块化和可扩展性
 
 这些抽象基类定义了框架的"合同"，任何想要集成到框架中的组件都必须遵守这些接口规范。
-通过这种设计，我们实现了真正的模块化：不同的实现可以无缝替换，只要它们遵守相同的接口。
+通过这种设计，我实现了真正的模块化：不同的实现可以无缝替换，只要它们遵守相同的接口。
 """
 
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union, AsyncIterator
 try:
-    from .data_structures import Plan, Action, Observation, ExecutionContext, AgentState
+    from .shared.data_structures import Plan, Action, Observation, ExecutionContext, AgentState
 except ImportError:
-    from neogenesis_system.data_structures import Plan, Action, Observation, ExecutionContext, AgentState
+    from neogenesis_system.shared.data_structures import Plan, Action, Observation, ExecutionContext, AgentState
 
 
 class BasePlanner(ABC):

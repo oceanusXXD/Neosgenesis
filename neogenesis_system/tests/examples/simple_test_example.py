@@ -13,7 +13,7 @@ import os
 # 添加项目根目录到路径，方便导入模块
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from meta_mab.reasoner import PriorReasoner
+from cognitive_engine.reasoner import PriorReasoner
 
 
 class SimpleTestExample(unittest.TestCase):

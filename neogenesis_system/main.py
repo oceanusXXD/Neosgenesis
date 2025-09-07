@@ -33,10 +33,10 @@ except ImportError:
 
 # 使用相对导入，因为main.py位于包内
 # from .meta_mab.controller import MainController  # 已废弃，使用 NeogenesisPlanner
-from .planners.neogenesis_planner import NeogenesisPlanner
-from .meta_mab.reasoner import PriorReasoner
-from .meta_mab.path_generator import PathGenerator
-from .meta_mab.mab_converger import MABConverger
+from .core.neogenesis_planner import NeogenesisPlanner
+from .cognitive_engine.reasoner import PriorReasoner
+from .cognitive_engine.path_generator import PathGenerator
+from .cognitive_engine.mab_converger import MABConverger
 from .config import LOGGING_CONFIG, FEATURE_FLAGS
 
 

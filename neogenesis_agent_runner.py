@@ -38,11 +38,14 @@ try:
     )
     
     # 导入Meta MAB组件
-    from neogenesis_system.meta_mab.reasoner import PriorReasoner
-    from neogenesis_system.meta_mab.path_generator import PathGenerator
-    from neogenesis_system.meta_mab.mab_converger import MABConverger
-    from neogenesis_system.meta_mab.llm_manager import LLMManager
-    from neogenesis_system.meta_mab.utils.tool_abstraction import global_tool_registry
+    from neogenesis_system.cognitive_engine.reasoner import PriorReasoner
+    from neogenesis_system.cognitive_engine.path_generator import PathGenerator
+    from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+    from neogenesis_system.providers.llm_manager import LLMManager
+    from neogenesis_system.tools.tool_abstraction import global_tool_registry
+    
+    # 导入认知调度器
+    from neogenesis_system.core.cognitive_scheduler import CognitiveScheduler
     
     # 检查是否可以使用真实组件
     REAL_COMPONENTS_AVAILABLE = True
@@ -379,6 +382,40 @@ class ProductionMemory(BaseMemory):
         
         if old_keys:
             logger.info(f"🧹 清理了 {len(old_keys)} 个过期记忆")
+    
+    def delete(self, key: str) -> bool:
+        """删除记忆中的信息 - 实现BaseMemory抽象方法"""
+        try:
+            if key in self._memory_store:
+                # 删除主存储
+                del self._memory_store[key]
+                
+                # 如果是对话历史，也从对话历史中删除
+                self._conversation_history = [
+                    item for item in self._conversation_history 
+                    if item.get("key") != key
+                ]
+                
+                logger.debug(f"🗑️ 删除记忆: {key}")
+                return True
+            else:
+                logger.debug(f"🔍 删除失败，键不存在: {key}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ 删除失败 {key}: {e}")
+            return False
+    
+    def exists(self, key: str) -> bool:
+        """检查键是否存在于记忆中 - 实现BaseMemory抽象方法"""
+        try:
+            exists = key in self._memory_store
+            logger.debug(f"🔍 检查键存在性 {key}: {'存在' if exists else '不存在'}")
+            return exists
+            
+        except Exception as e:
+            logger.error(f"❌ 检查键存在性失败 {key}: {e}")
+            return False
 
 
 # =============================================================================
@@ -388,14 +425,21 @@ class ProductionMemory(BaseMemory):
 class NeogenesisAgent(BaseAgent):
     """
     完整的Neogenesis智能Agent
-    组装了NeogenesisPlanner、ProductionToolExecutor和ProductionMemory
+    组装了NeogenesisPlanner、ProductionToolExecutor、ProductionMemory和CognitiveScheduler
+    
+    新增功能：
+    - 认知调度器：赋予Agent"空闲"概念和主动反思能力
+    - 后台认知循环：在任务间隙进行经验回溯和创新思考
+    - 智能状态管理：从"任务驱动"升级为"任务驱动+自我驱动"
     """
     
     def __init__(self, 
                  planner,  # NeogenesisPlanner or mock
                  tool_executor,  # ProductionToolExecutor or mock
                  memory,  # ProductionMemory or mock
-                 name: str = "NeogenesisAgent"):
+                 name: str = "NeogenesisAgent",
+                 enable_cognitive_scheduler: bool = True,
+                 cognitive_config: Optional[Dict[str, Any]] = None):
         
         super().__init__(planner, tool_executor, memory, name)
         
@@ -412,10 +456,69 @@ class NeogenesisAgent(BaseAgent):
         self.current_context = None
         self.is_running = False
         
+        # 🧠 认知调度器 - 新增功能
+        self.enable_cognitive_scheduler = enable_cognitive_scheduler
+        self.cognitive_scheduler = None
+        
+        if self.enable_cognitive_scheduler:
+            try:
+                # 获取StateManager（如果planner支持）
+                state_manager = None
+                if hasattr(self.planner, 'state_manager'):
+                    state_manager = self.planner.state_manager
+                elif hasattr(self.planner, 'get_state_manager'):
+                    state_manager = self.planner.get_state_manager()
+                else:
+                    # 如果planner没有StateManager，创建一个临时的
+                    from neogenesis_system.shared.state_manager import StateManager
+                    state_manager = StateManager()
+                    logger.warning("⚠️ Planner未提供StateManager，创建临时实例")
+                
+                # 获取LLM客户端（如果planner支持）
+                llm_client = None
+                if hasattr(self.planner, 'llm_manager'):
+                    llm_client = self.planner.llm_manager
+                elif hasattr(self.planner, 'get_llm_client'):
+                    llm_client = self.planner.get_llm_client()
+                
+                # 创建认知调度器
+                self.cognitive_scheduler = CognitiveScheduler(
+                    state_manager=state_manager,
+                    llm_client=llm_client,
+                    config=cognitive_config
+                )
+                
+                # 🔗 为回溯引擎提供依赖组件
+                if hasattr(self.planner, 'path_generator') and hasattr(self.planner, 'mab_converger'):
+                    success = self.cognitive_scheduler.update_retrospection_dependencies(
+                        path_generator=self.planner.path_generator,
+                        mab_converger=self.planner.mab_converger
+                    )
+                    if success:
+                        logger.info("🔗 回溯引擎依赖组件链接完成")
+                    else:
+                        logger.warning("⚠️ 回溯引擎依赖组件链接失败")
+                
+                # 🔗 将认知调度器传递给规划器
+                if hasattr(self.planner, 'cognitive_scheduler'):
+                    self.planner.cognitive_scheduler = self.cognitive_scheduler
+                    logger.info("🔗 认知调度器已连接到规划器")
+                
+                logger.info("🧠 认知调度器已集成 - 主动认知模式就绪")
+                
+            except Exception as e:
+                logger.error(f"❌ 认知调度器初始化失败: {e}")
+                logger.warning("⚠️ 将以传统模式运行（仅任务驱动）")
+                self.enable_cognitive_scheduler = False
+        
         logger.info(f"🤖 {self.name} 初始化完成")
         logger.info(f"   规划器: {self.planner.name}")
         logger.info(f"   工具执行器: {self.tool_executor.name}")
         logger.info(f"   记忆系统: {self.memory.name}")
+        if self.enable_cognitive_scheduler:
+            logger.info("   🧠 认知调度器: 已启用 (主动认知模式)")
+        else:
+            logger.info("   🧠 认知调度器: 未启用 (传统任务驱动模式)")
     
     def run(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -428,6 +531,12 @@ class NeogenesisAgent(BaseAgent):
         self.is_running = True
         start_time = time.time()
         task_id = f"task_{int(time.time())}"
+        
+        # 🧠 启动认知调度器（如果已启用）
+        if self.enable_cognitive_scheduler and self.cognitive_scheduler:
+            if not self.cognitive_scheduler.is_running:
+                logger.info("🧠 启动认知调度器...")
+                self.cognitive_scheduler.start()
         
         try:
             # =============================================================================
@@ -604,6 +713,70 @@ class NeogenesisAgent(BaseAgent):
         total = self.stats["total_tasks"]
         return self.stats["successful_tasks"] / total if total > 0 else 0.0
     
+    def start_cognitive_mode(self):
+        """
+        启动认知模式 - 开启主动反思和创想功能
+        
+        在Agent长期运行或交互式会话中调用，
+        让Agent获得"内在独白"和主动学习能力
+        """
+        if not self.enable_cognitive_scheduler:
+            logger.warning("⚠️ 认知调度器未启用，无法启动认知模式")
+            return False
+        
+        if not self.cognitive_scheduler:
+            logger.error("❌ 认知调度器未初始化")
+            return False
+        
+        if self.cognitive_scheduler.is_running:
+            logger.info("🧠 认知调度器已在运行")
+            return True
+        
+        try:
+            self.cognitive_scheduler.start()
+            logger.info("✅ 认知模式已启动 - Agent开始主动思考")
+            return True
+        except Exception as e:
+            logger.error(f"❌ 启动认知模式失败: {e}")
+            return False
+    
+    def stop_cognitive_mode(self):
+        """
+        停止认知模式 - 关闭后台认知功能
+        
+        在Agent需要释放资源或系统关闭时调用
+        """
+        if not self.cognitive_scheduler:
+            return
+        
+        try:
+            self.cognitive_scheduler.stop()
+            logger.info("🛑 认知模式已停止")
+        except Exception as e:
+            logger.error(f"❌ 停止认知模式失败: {e}")
+    
+    def get_cognitive_status(self) -> Dict[str, Any]:
+        """
+        获取认知状态报告
+        
+        Returns:
+            认知调度器的详细状态信息
+        """
+        if not self.cognitive_scheduler:
+            return {
+                "enabled": False,
+                "status": "认知调度器未启用"
+            }
+        
+        base_status = self.cognitive_scheduler.get_status()
+        base_status["enabled"] = self.enable_cognitive_scheduler
+        
+        return base_status
+    
+    def __del__(self):
+        """Agent析构时自动停止认知调度器"""
+        self.stop_cognitive_mode()
+    
     def get_detailed_stats(self) -> Dict[str, Any]:
         """获取详细统计信息"""
         memory_stats = self.memory.get_memory_stats()
@@ -714,12 +887,14 @@ def create_neogenesis_agent(api_key: str = "", config: Optional[Dict] = None):
         tool_executor = ProductionToolExecutor()
         memory = ProductionMemory()
         
-        # 组装Agent
+        # 组装Agent（默认启用认知调度器）
         agent = NeogenesisAgent(
             planner=neogenesis_planner,
             tool_executor=tool_executor,
             memory=memory,
-            name="NeogenesisAgent"
+            name="NeogenesisAgent",
+            enable_cognitive_scheduler=config.get('enable_cognitive_scheduler', True),
+            cognitive_config=config.get('cognitive_config', None)
         )
         
         logger.info("🎉 NeogenesisAgent创建完成！")
@@ -830,13 +1005,117 @@ def main():
         print(f"🎯 用户只需调用: agent.run(\"你的问题\")")
         print(f"💡 系统内部会自动完成7个步骤的完整流程")
         
-        # 询问是否进入聊天模式
-        try_chat = input(f"\n💬 是否进入聊天模式体验？(y/n): ").strip().lower()
-        if try_chat in ['y', 'yes', '是', 'ok']:
-            agent.chat_mode()
+        # 询问是否体验认知模式
+        try_cognitive = input(f"\n🧠 是否体验全新的认知模式？(y/n): ").strip().lower()
+        if try_cognitive in ['y', 'yes', '是', 'ok']:
+            cognitive_mode_demo(agent)
+        else:
+            # 询问是否进入聊天模式
+            try_chat = input(f"\n💬 是否进入聊天模式体验？(y/n): ").strip().lower()
+            if try_chat in ['y', 'yes', '是', 'ok']:
+                agent.chat_mode()
         
     except Exception as e:
         logger.error(f"❌ 演示过程中出现错误: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def cognitive_mode_demo(agent):
+    """
+    认知模式演示 - 展示Agent的主动反思和创想能力
+    
+    这个演示展示了Agent如何在任务完成后进入"认知空闲"状态，
+    并主动进行经验回溯、模式识别和创新思考。
+    """
+    print("\n🧠 Neogenesis认知模式演示")
+    print("展示Agent的'内在独白'和主动思考能力")
+    print("="*60)
+    
+    try:
+        # 显示认知状态
+        cognitive_status = agent.get_cognitive_status()
+        print(f"\n🧠 当前认知状态: {cognitive_status}")
+        
+        if not cognitive_status.get("enabled", False):
+            print("⚠️ 认知调度器未启用，正在启用...")
+            # 重新创建带认知调度器的Agent
+            config = {
+                'api_key': os.getenv('DEEPSEEK_API_KEY', ''),
+                'search_engine': 'duckduckgo',
+                'enable_cognitive_scheduler': True,
+                'cognitive_config': {
+                    'idle_detection': {
+                        'min_idle_duration': 5.0,    # 缩短演示时间
+                        'check_interval': 1.0
+                    },
+                    'cognitive_tasks': {
+                        'retrospection_interval': 15.0,  # 缩短演示间隔
+                        'ideation_interval': 30.0
+                    }
+                }
+            }
+            agent = create_neogenesis_agent(config=config)
+        
+        # 手动启动认知模式
+        print("\n🚀 启动认知模式...")
+        if agent.start_cognitive_mode():
+            print("✅ 认知模式已启动 - Agent开始主动思考")
+        
+        # 执行几个任务让Agent产生经验
+        cognitive_queries = [
+            "什么是强化学习的核心思想？",
+            "搜索深度学习在医疗领域的应用",
+            "分析元学习对人工智能发展的意义",
+        ]
+        
+        print("\n📚 执行学习任务，为Agent积累认知经验...")
+        for i, query in enumerate(cognitive_queries, 1):
+            print(f"\n--- 认知任务{i}: {query[:30]}... ---")
+            try:
+                result = agent.run(query)
+                print(f"✅ 任务完成: {len(result)} 字符回答")
+                
+                # 显示认知状态变化
+                status = agent.get_cognitive_status()
+                print(f"🧠 认知状态: {status.get('current_mode', 'unknown')} "
+                      f"| 活跃认知任务: {status.get('active_cognitive_tasks', 0)} "
+                      f"| 队列中任务: {status.get('queued_cognitive_tasks', 0)}")
+                
+            except Exception as e:
+                print(f"❌ 任务失败: {e}")
+            
+            # 给认知调度器时间工作
+            print("⏳ 等待认知调度器分析和思考...")
+            time.sleep(8)
+        
+        print("\n📊 最终认知统计:")
+        final_status = agent.get_cognitive_status()
+        if 'stats' in final_status:
+            stats = final_status['stats']
+            print(f"   🔄 总空闲周期: {stats.get('total_idle_periods', 0)}")
+            print(f"   ⏱️ 总空闲时间: {stats.get('total_idle_time', 0):.1f}s")
+            print(f"   🧠 完成认知任务: {stats.get('cognitive_tasks_completed', 0)}")
+            print(f"   📚 回溯会话: {stats.get('retrospection_sessions', 0)}")
+            print(f"   💡 创想会话: {stats.get('ideation_sessions', 0)}")
+            print(f"   🧩 知识综合: {stats.get('knowledge_synthesis_sessions', 0)}")
+        
+        # 停止认知模式
+        print("\n🛑 停止认知模式...")
+        agent.stop_cognitive_mode()
+        
+        print("\n" + "="*60)
+        print("🎉 认知模式演示完成！")
+        print("💡 您刚才见证了AI的重大进化：")
+        print("   ✨ 从'被动应激'升级为'主动认知'")
+        print("   🧠 任务完成后自动进入反思状态")
+        print("   🔍 主动分析成功和失败模式")
+        print("   💡 持续产生创新思路和突破性想法") 
+        print("   📚 积累和整合认知成果为未来决策服务")
+        print("   🚀 这就是'内在独白循环'的威力！")
+        
+    except Exception as e:
+        print(f"❌ 认知模式演示失败: {e}")
         import traceback
         traceback.print_exc()
 

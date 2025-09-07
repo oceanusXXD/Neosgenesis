@@ -18,12 +18,12 @@ __email__ = "team@neogenesis.ai"
 
 # 导入核心组件
 # from .meta_mab.controller import MainController  # 已废弃，使用 NeogenesisPlanner
-from .meta_mab.reasoner import PriorReasoner
-from .meta_mab.path_generator import PathGenerator, LLMDrivenDimensionCreator
-from .meta_mab.mab_converger import MABConverger
+from .cognitive_engine.reasoner import PriorReasoner
+from .cognitive_engine.path_generator import PathGenerator, LLMDrivenDimensionCreator
+from .cognitive_engine.mab_converger import MABConverger
 
 # 导入框架级通用数据结构
-from .data_structures import (
+from .shared.data_structures import (
     Action,
     Plan,
     Observation,
@@ -45,10 +45,10 @@ from .abstractions import (
 )
 
 # 导入具体实现
-from .planners import NeogenesisPlanner
+from .core.neogenesis_planner import NeogenesisPlanner
 
 # 导入领域特定数据结构
-from .meta_mab.data_structures import (
+from .cognitive_engine.data_structures import (
     ReasoningPath,
     TaskComplexity,
     EnhancedDecisionArm,
@@ -145,10 +145,10 @@ def create_system(api_key: str = None, config: dict = None):
         >>> plan = planner.create_plan("查询最近上映的电影")
         >>> print(plan.actions)
     """
-    from .planners.neogenesis_planner import NeogenesisPlanner
-    from .meta_mab.reasoner import PriorReasoner
-    from .meta_mab.path_generator import PathGenerator
-    from .meta_mab.mab_converger import MABConverger
+    from .core.neogenesis_planner import NeogenesisPlanner
+    from .cognitive_engine.reasoner import PriorReasoner
+    from .cognitive_engine.path_generator import PathGenerator
+    from .cognitive_engine.mab_converger import MABConverger
     
     # 创建组件
     prior_reasoner = PriorReasoner()

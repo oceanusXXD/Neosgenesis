@@ -1,4 +1,4 @@
-# 🧠 Neogenesis System - Metacognitive Intelligent Decision-Making Workbench
+# 🧠 Neogenesis System - Metacognitive AI Decision Framework
 
 <div align="center">
 
@@ -7,9 +7,9 @@
 [![Multi-LLM](https://img.shields.io/badge/AI-Multi--LLM%20Support-orange.svg)](https://github.com)
 [![MAB](https://img.shields.io/badge/Algorithm-Multi--Armed%20Bandit-red.svg)](https://en.wikipedia.org/wiki/Multi-armed_bandit)
 
-## 🌟 Making AI Think Like Experts - A Breakthrough in Metacognitive Intelligent Decision-Making
+## 🌟 Making AI Think Like Experts - Metacognitive Decision Intelligence
 
-[Quick Start](#-quick-start) · [Core Features](#-core-innovation-redefining-ai-decision-making-process) · [System Architecture](#️-system-architecture--tech-stack) · [Demo Experience](#-demo-experience) · [Contributing](#-contributing-guide)
+[Quick Start](#-quick-start) · [Core Features](#-core-innovations) · [Installation](#-installation) · [Usage](#-usage-examples)
 
 </div>
 
@@ -17,462 +17,178 @@
 
 ## 🎯 Project Overview
 
-**Neogenesis System** is an advanced AI decision-making framework built on metacognitive theory with **LangChain-inspired tool integration**. It transcends the traditional "question-answer" paradigm, endowing agents with the ability to **"think about how to think"** while dynamically leveraging external tools and real-time information. Through a series of architectural innovations including unified tool abstraction and tool-enhanced verification, this system enables AI to perform real-time self-verification, learning, and evolution during the thinking phase of decision-making, allowing it to make high-quality decisions in complex and uncertain environments, just like human experts.
+**Neogenesis System** is an advanced AI decision-making framework that enables agents to **"think about how to think"**. Unlike traditional question-answer systems, it implements a metacognitive approach with real-time learning, tool integration, and multi-LLM support, allowing AI to make expert-level decisions in complex environments.
 
-### 🌟 Why Choose Neogenesis?
+### 🌟 Key Features
 
-- **🧠 Metacognitive Breakthrough**: Agents not only think about problems but also think about "how to think"
-- **🔧 Tool-Enhanced Intelligence**: LangChain-inspired unified tool abstraction enabling AI to dynamically invoke external capabilities during decision-making
-- **🔬 Instant Learning**: Get feedback during the thinking phase, breaking free from the traditional "learn only after execution" limitation
-- **💡 Innovation Breakthrough**: Original Aha-Moment mechanism that enables AI to burst with creativity in difficult situations
-- **🏆 Wisdom Accumulation**: Golden template system that solidifies successful experiences into reusable wisdom
-- **🌐 Real-time Enhancement**: RAG technology integration with tool-enhanced verification for making informed decisions based on latest information
-- **🤖 Multi-LLM Architecture**: Universal LLM interface supporting OpenAI, Anthropic, DeepSeek, Ollama, and more with intelligent provider selection
+- **🧠 Metacognitive Intelligence**: AI that thinks about "how to think"
+- **🔧 Tool-Enhanced Decisions**: Dynamic tool integration during decision-making
+- **🔬 Real-time Learning**: Learns during thinking phase, not just after execution
+- **💡 Aha-Moment Breakthroughs**: Creative problem-solving when stuck
+- **🏆 Experience Accumulation**: Builds reusable decision templates from success
+- **🤖 Multi-LLM Support**: OpenAI, Anthropic, DeepSeek, Ollama with auto-failover
 
 ---
 
-## 🎯 Framework Positioning: The Cognitive Core of AI Agents
+## 🚀 Core Innovations
 
-Many users ask: Is this an AI framework or an Agent framework?
+### 1. 🔬 Five-Stage Decision Process
 
-**Answer: Neogenesis System is an advanced framework for building the "cognitive core" of intelligent agents.**
-
-### Differences and Complementarity with Other Frameworks
-
-#### 🔬 Difference from General AI Frameworks (like TensorFlow/PyTorch)
-
-This project doesn't focus on low-level model training, but rather on how to organize and orchestrate pre-trained large language models (LLMs) to complete complex cognitive tasks.
-
-#### 🤝 Complementarity with Traditional Agent Frameworks (like LangChain)
-
-Traditional Agent frameworks focus more on tool invocation, task orchestration, and "action loops" that interact with external environments. Neogenesis focuses on the "internal thinking loop" before agents take concrete actions—namely, how to perform high-quality planning, reasoning, reflection, and decision-making.
-
-### 🧠 Core Value Positioning
-
-You can think of **Neogenesis as the "brain" or "operating system" for building Complex Decision-Making Agents**. It provides agents with a powerful, transparent, and self-evolving thinking engine that learns from experience.
+Traditional AI: **Think → Execute → Learn**  
+Neogenesis: **Think → Verify → Learn → Optimize → Decide** *(all during thinking phase)*
 
 ```mermaid
 graph LR
-    A[External Task Input] --> B[Neogenesis Cognitive Core]
-    B --> C[High-Quality Decision Output]
-    B --> D[Traditional Agent Framework]
-    D --> E[Tool Invocation & Environment Interaction]
-    E --> F[Task Execution Results]
-    F --> B
-    
-    style B fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-```
-
----
-
-## 🚀 Core Innovation: Redefining AI Decision-Making Process
-
-The core value of Neogenesis System lies in its unique architectural design, which transforms the decision-making process from a linear black box into a transparent, iterative, and self-optimizing metacognitive loop **enhanced by a unified tool ecosystem**.
-
-### 🔧 Tool-Enhanced Metacognitive Architecture
-
-**Revolutionary Integration**: Unlike traditional AI systems that rely solely on pre-trained knowledge, Neogenesis seamlessly integrates **LangChain-inspired tool abstraction** throughout the entire decision-making process. This enables AI to dynamically gather real-time information, verify assumptions, and take actions while thinking—fundamentally changing how AI approaches complex problems.
-
-**Key Innovation**: The system implements tool-enhanced verification at the core of the five-stage process, where each thinking step can be augmented by external tool capabilities. This creates a **"thinking-with-tools"** paradigm that mirrors how human experts use resources and tools during complex decision-making.
-
-### 2. 🔬 Five-Stage "Verification-Learning" Decision Process (Core Innovation)
-
-We abandon the traditional "Think→Execute→Learn" model and pioneer a closed-loop process that enables learning during the thinking phase. This allows AI to predict and avoid erroneous thinking paths before investing actual costs, significantly improving decision quality and efficiency.
-
-```mermaid
-graph TD
-    subgraph "AI Thinking Process"
-        A[Stage 1: Thinking Seed Generation<br/>(RAG-Enhanced Seed Generation)] --> B{Stage 2: Seed Direction Verification<br/>(Initial Feasibility Check)};
-        B --> C[Stage 3: Multi-Path Thinking Expansion<br/>(Diverse Path Generation)];
-        C --> D[Stage 4: Path Verification & Instant Learning<br/>(Path Validation & Instant Learning)];
-        D --> E[Stage 5: Wisdom Decision Birth<br/>(Meta-MAB Final Decision)];
-    end
-
-    subgraph "Real-time Learning Loop"
-        D -- "Verification Results (Success/Failure)" --> F((MAB Knowledge Base Update));
-        F -- "Update Weights" --> E;
-    end
-
-    style A fill:#e3f2fd
-    style C fill:#e0f7fa
+    A[Seed Generation] --> B[Verification] 
+    B --> C[Path Generation] 
+    C --> D[Learning & Optimization]
+    D --> E[Final Decision]
+    D --> C
     style D fill:#fff9c4
-    style E fill:#e8f5e9
-    style F fill:#ffecb3
 ```
 
-**Professional Value**: This "thinking-as-learning" mode gives AI unprecedented reflection and rehearsal capabilities. It simulates the process where human experts repeatedly deliberate and evaluate the feasibility of different solutions in their minds when formulating plans, thereby eliminating inferior ideas in early stages and focusing on high-potential directions.
+**Value**: AI learns and optimizes *before* execution, avoiding costly mistakes and improving decision quality.
 
-### 3. 🎰 Meta Multi-Armed Bandit Algorithm
+### 2. 🎰 Multi-Armed Bandit Learning
 
-The heart of the system is a deeply modified MAB learning engine that is not only a selector but also a generator and manager of strategies.
+- **Experience Accumulation**: Learns which decision strategies work best in different contexts
+- **Golden Templates**: Automatically identifies and reuses successful reasoning patterns
+- **Exploration vs Exploitation**: Balances trying new approaches vs using proven methods
 
-#### 🏆 Golden Template System
+### 3. 💡 Aha-Moment Breakthrough
 
-**Innovation**: The system can automatically identify and "solidify" reasoning paths that consistently succeed in specific scenarios, elevating them to "golden templates." When encountering similar problems in the future, the system will prioritize these templates for efficient knowledge reuse.
+When conventional approaches fail, the system automatically:
+- Activates creative problem-solving mode
+- Generates unconventional thinking paths
+- Breaks through decision deadlocks with innovative solutions
 
-**Professional Value**: This is an experience-driven decision acceleration mechanism. It enables AI to learn from past successes and develop its own "decision intuition," dramatically reducing thinking time while ensuring quality.
+### 4. 🔧 Tool-Enhanced Intelligence
 
-#### 🎯 Dynamic Algorithm Fusion
+- **Real-time Information**: Integrates web search and verification tools during thinking
+- **Dynamic Tool Selection**: Hybrid MAB+LLM approach for optimal tool choice
+- **Unified Tool Interface**: LangChain-inspired tool abstraction for extensibility
 
-**Innovation**: The MAB Converger can dynamically select the most appropriate MAB algorithm (such as exploration-heavy Thompson Sampling or exploitation-heavy Epsilon-Greedy) based on the "convergence" status of all current thinking paths.
-
-**Professional Value**: Achieves intelligent balance between exploration (trying new ideas) and exploitation (using known optimal solutions), ensuring the system neither falls into local optima nor engages in endless inefficient exploration.
-
-### 4. 💡 Aha-Moment Innovation Breakthrough Mechanism
-
-This mechanism is triggered when the system faces the following dilemmas:
-
-- All conventional thinking paths have confidence levels below the threshold
-- The system's decisions fail consecutively multiple times
-- All paths are deemed infeasible during real-time verification
-
-**Innovation**: Once triggered, the system activates creative_bypass mode, forcing the PathGenerator to generate a batch of unconventional, highly innovative thinking paths and inject them into the decision pool, breaking through thinking deadlocks.
-
-**Professional Value**: Simulates the **"inspiration burst"** that human experts experience when encountering bottlenecks. It provides AI with the ability to break out of conventional thinking frameworks and engage in non-linear thinking, which is crucial for solving highly complex and innovative problems.
-
-### 5. 🌐 RAG-Enhanced Thinking & Verification
-
-The system's decision starting point and verification process are deeply integrated with Retrieval-Augmented Generation (RAG) technology.
-
-**Innovation**:
-
-- **RAG Seed Generation**: When generating initial "thinking seeds," RAGSeedGenerator first intelligently analyzes problems, forms search strategies, then obtains real-time, relevant information from the internet through the unified tool interface, and finally synthesizes this information to generate fact-based, context-rich thinking starting points.
-
-- **Tool-Enhanced Verification**: The system features a revolutionary tool-enhanced verification mechanism where MainController's verify_idea_feasibility method now operates without legacy fallback mechanisms. Instead, it uses the unified tool interface to dynamically invoke search tools (WebSearchTool, IdeaVerificationTool) during the decision process, enabling LLM to intelligently select and execute appropriate tools based on context.
-
-- **LLM-Tool Interaction**: The system implements a sophisticated `_execute_llm_with_tools` method that allows LLMs to express tool usage intent through structured `**TOOL_CALL**: [tool_name] | [params]` format, with results seamlessly integrated back into the reasoning process.
-
-**Professional Value**: The unified tool abstraction ensures AI thinking is both **"grounded"** and **"actionable"**—decisions are based not only on internal model knowledge but also leverage real-time external capabilities through a LangChain-inspired tool ecosystem. This greatly enhances decision timeliness, accuracy, reliability, and extensibility.
-
-### 6. 🤖 Universal Multi-LLM Architecture
-
-The system features a completely model-agnostic architecture that seamlessly integrates with multiple LLM providers through a unified interface.
-
-**Innovation**:
-
-- **Provider Abstraction**: All LLM providers implement the same `BaseLLMClient` interface, ensuring consistent behavior across different models
-- **Intelligent Provider Selection**: Automatic provider selection based on availability, performance, and cost optimization
-- **Seamless Fallback**: Automatic failover to alternative providers when the primary provider is unavailable or rate-limited
-- **Unified Configuration**: Centralized configuration system managing API keys, model preferences, and provider-specific settings
-
-**Supported Providers**:
-- **OpenAI**: GPT-3.5, GPT-4, GPT-4o series with function calling and vision capabilities
-- **Anthropic**: Claude-3 series (Opus, Sonnet, Haiku) with superior reasoning abilities
-- **DeepSeek**: Cost-effective models with strong coding and Chinese language support
-- **Ollama**: Local deployment for privacy-focused applications
-- **Azure OpenAI**: Enterprise-grade OpenAI models with enhanced security
-
-**Professional Value**: This architecture eliminates vendor lock-in, provides resilience against API outages, enables cost optimization through provider switching, and future-proofs the system against the rapidly evolving LLM landscape. Organizations can leverage the best model for each specific task while maintaining operational continuity.
-
-### 7. 🎯 Advanced Hybrid Tool Selection: MAB+LLM Fusion Mode
-
-Neogenesis System features a revolutionary **Hybrid Tool Selection Architecture** that transcends traditional LLM-only approaches by intelligently combining Multi-Armed Bandit (MAB) experience-driven optimization with LLM semantic understanding. This breakthrough addresses the fundamental limitations of current AI systems in tool selection scenarios.
-
-#### 🧠 Hybrid Selection Architecture Overview
-
-Our system implements a sophisticated **dual-mode tool selection strategy** that dynamically switches between two complementary approaches:
-
-**🏆 Experience Mode (MAB-led Selection)**
-When encountering **familiar tools** with sufficient performance history:
-- **MAB Converger** analyzes comprehensive performance metrics (success rate, execution time, user satisfaction)
-- **Thompson Sampling** or **UCB algorithms** select optimal tools based on empirical evidence
-- **Confidence-driven decisions** ensure reliable tool selection for production scenarios
-- **Continuous learning** from every tool execution to refine selection accuracy
-
-**🔍 Exploration Mode (LLM-led Selection)**  
-When facing **unfamiliar tools** in cold-start scenarios:
-- **Advanced cold-start detection** identifies tools lacking sufficient usage history
-- **LLM semantic analysis** leverages contextual understanding for intelligent exploration
-- **Intent-based tool matching** selects tools based on task requirements and semantic similarity
-- **Exploration bonus mechanisms** encourage strategic experimentation with new tools
-
-#### 🔄 Intelligent Mode Switching Logic
-
-The system employs **multi-dimensional cold-start detection** to determine the optimal selection mode:
-
-```python
-# Cold-start factors evaluation
-cold_start_factors = {
-    "usage_frequency": tool_activation_count < min_usage_threshold,
-    "reliability": tool_success_rate < min_reliability_score, 
-    "recency": hours_since_last_use > max_idle_hours,
-    "sample_sufficiency": tool_sample_size < min_sample_size
-}
-
-# Weighted cold-start score calculation
-cold_score = sum(weight * factor for factor, weight in zip(
-    cold_start_factors.values(), 
-    detection_weights.values()
-))
-
-# Dynamic mode selection
-if cold_score > exploration_trigger_threshold:
-    mode = "exploration_llm_led"  # LLM takes control
-else:
-    mode = "experience_mab_led"   # MAB takes control
-```
-
-#### 📊 Tool Selection Performance Comparison
-
-| **Selection Aspect** | **Neogenesis Hybrid Approach** | **LangChain Standard Approach** |
-|---------------------|--------------------------------|--------------------------------|
-| **🎯 Selection Strategy** | **Dual-mode hybrid**: MAB experience + LLM exploration with intelligent mode switching | LLM-only selection based on tool descriptions and context |
-| **📈 Learning Capability** | **Continuous learning** from tool execution results with MAB feedback loops | No built-in learning mechanism; static tool selection |
-| **🧠 Cold-Start Handling** | **Intelligent cold-start detection** with automatic LLM fallback for unfamiliar tools | No cold-start awareness; same approach for all tools |
-| **⚡ Performance Optimization** | **Real-time optimization** based on success rates, execution time, and user feedback | No performance-based optimization or tool ranking |
-| **🔄 Adaptability** | **Dynamic adaptation** to changing tool performance and new tool introduction | Static tool selection requiring manual reconfiguration |
-| **📊 Decision Confidence** | **Quantified confidence scores** with transparency in decision reasoning | No confidence metrics or decision explanation |
-| **🎲 Exploration Strategy** | **Balanced exploration-exploitation** using Thompson Sampling and UCB algorithms | Random or description-based selection without exploration strategy |
-| **📈 Success Rate Tracking** | **Comprehensive performance tracking** with success rates, latency, and user satisfaction | No built-in performance tracking or analytics |
-| **🔧 Tool Discovery** | **Experience-guided discovery** with MAB-optimized tool recommendation | Description-based discovery without performance consideration |
-| **🚀 Scalability** | **Automatic scaling** with new tools seamlessly integrated into MAB learning | Manual tool integration requiring prompt and description updates |
-| **🎯 Context Sensitivity** | **Dual-context awareness**: Historical performance + semantic understanding | Single-context awareness: semantic understanding only |
-| **💡 Innovation Support** | **Aha-moment breakthrough** triggers for creative tool combinations | No innovation mechanisms or creative tool usage patterns |
-
-#### 🌟 Breakthrough Advantages
-
-**1. 🧠 Metacognitive Tool Intelligence**
-- **Self-aware tool selection**: The system knows when it knows (experience mode) vs. when it needs to explore (exploration mode)
-- **Confidence-based decision making**: Quantified confidence scores guide tool selection strategies
-- **Learning transparency**: Clear reasoning for why specific tools were selected
-
-**2. ⚡ Performance-Driven Optimization**  
-- **Empirical evidence priority**: Historical performance data drives tool selection for familiar tools
-- **Real-time adaptation**: Continuous learning from tool execution results
-- **Success rate maximization**: MAB algorithms optimize for highest success probability
-
-**3. 🔍 Intelligent Exploration**
-- **Strategic cold-start handling**: LLM semantic understanding guides exploration of unfamiliar tools
-- **Risk-aware experimentation**: Balanced exploration with exploitation for optimal learning
-- **Context-sensitive discovery**: Tool exploration aligned with task requirements and domain knowledge
-
-**4. 📈 Continuous Evolution**
-- **Experience accumulation**: Every tool execution contributes to selection intelligence
-- **Dynamic tool ranking**: Tool preferences evolve based on performance evidence
-- **Adaptive thresholds**: Cold-start detection parameters self-adjust based on system experience
-
-#### 🔧 Implementation Architecture
-
-```mermaid
-graph TD
-    subgraph "Hybrid Tool Selection Engine"
-        TI[Tool Input Request] --> CSD[Cold-Start Detection]
-        CSD --> |"Familiar Tool"| MAB[MAB Experience Mode]
-        CSD --> |"Unfamiliar Tool"| LLM[LLM Exploration Mode]
-        
-        MAB --> TS[Thompson Sampling]
-        MAB --> UCB[UCB Algorithm] 
-        MAB --> EG[Epsilon-Greedy]
-        
-        LLM --> SA[Semantic Analysis]
-        LLM --> IM[Intent Matching]
-        LLM --> CD[Context Driven Selection]
-        
-        TS --> TD[Tool Decision]
-        UCB --> TD
-        EG --> TD
-        SA --> TD
-        IM --> TD
-        CD --> TD
-        
-        TD --> TE[Tool Execution]
-        TE --> PF[Performance Feedback]
-        PF --> MAB
-    end
-    
-    style MAB fill:#e8f5e8,stroke:#388e3c,stroke-width:3px
-    style LLM fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style CSD fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-```
-
-**Professional Value**: This revolutionary approach transforms tool selection from a static, description-based process into a **dynamic, performance-optimized, and continuously learning system** that combines the best of algorithmic optimization with semantic intelligence.
-
-### 8. 🔧 Unified Tool Abstraction System
-
-Drawing inspiration from LangChain's tool ecosystem, Neogenesis implements a sophisticated tool abstraction layer that allows AI to dynamically invoke external capabilities during decision-making.
-
-**Innovation**:
-
-- **BaseTool Interface**: All tools implement a unified `BaseTool` interface with standardized `execute()` methods, enabling consistent tool interaction patterns
-- **ToolRegistry**: Centralized tool management system providing registration, discovery, lifecycle management, and health monitoring for all available tools
-- **Dynamic Tool Discovery**: LLMs can discover and invoke appropriate tools based on context through intelligent tool selection mechanisms
-- **Tool Result Integration**: Tool execution results are seamlessly integrated back into the LLM's reasoning process, enabling iterative tool-enhanced thinking
-
-**Current Tool Ecosystem**:
-- **WebSearchTool**: Real-time web search capabilities for information gathering
-- **IdeaVerificationTool**: Specialized tool for validating idea feasibility through structured analysis
-- **Extensible Framework**: Easy addition of new tools (database queries, API calls, file operations, etc.)
-
-**LLM-Tool Interaction Pattern**:
-
-```text
-LLM Request: "**TOOL_CALL**: web_search | query='latest AI developments'"
-System: Executes WebSearchTool → Returns search results
-LLM: Integrates results → Continues enhanced reasoning
-```
-
-**Professional Value**: This tool abstraction system transforms the AI from a passive question-answering system into an active agent capable of gathering information, verifying assumptions, and taking actions during the decision-making process. The unified interface ensures tool extensibility while maintaining system coherence.
 
 ---
 
-## 🔗 LangChain Integration: Advanced Chain Management & Persistent State
+## 🚀 Installation
 
-Neogenesis System features a comprehensive **LangChain Integration Layer** that extends the core decision-making capabilities with enterprise-grade chain management, persistent state storage, and distributed execution capabilities. This integration transforms the system from a standalone decision engine into a full-featured LangChain-compatible framework capable of handling complex, long-running workflows with persistent memory and state management.
+### Requirements
 
-### 🌟 LangChain Integration Overview
+- Python 3.8 or higher
+- pip package manager
 
-The **LangChain Integration** brings professional-grade capabilities that enable:
-- **Context-aware decision making**: Connect language models to contextual sources like prompt instructions, examples, and content requiring responses
-- **Reasoning capabilities**: Rely on language models for reasoning, determining how to respond or what actions to take
-- **Persistent workflows**: Maintain state across sessions and enable complex multi-step processes
-- **Distributed execution**: Scale decision-making across multiple nodes with shared state management
+### Setup
 
-### 🏗️ Core Integration Components
+```bash
+# Clone repository
+git clone https://github.com/your-repo/neogenesis-system.git
+cd neogenesis-system
 
-The LangChain integration is built around several key architectural components:
+# Create and activate virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-```mermaid
-graph TD
-    subgraph "LangChain Integration Layer"
-        PS[PersistentStorage<br/><b>(persistent_storage.py)</b><br/>Multi-Backend Storage Engine]
-        SM[StateManagement<br/><b>(state_management.py)</b><br/>Transaction-based State Control]
-        DS[DistributedState<br/><b>(distributed_state.py)</b><br/>Multi-Node State Coordination]
-        AC[AdvancedChains<br/><b>(advanced_chains.py)</b><br/>Complex Chain Workflows]
-        EE[ExecutionEngines<br/><b>(execution_engines.py)</b><br/>Parallel Execution Framework]
-        CO[Coordinators<br/><b>(coordinators.py)</b><br/>Multi-Chain Coordination]
-        AD[Adapters<br/><b>(adapters.py)</b><br/>LangChain Compatibility Layer]
-        TO[Tools<br/><b>(tools.py)</b><br/>Extended Tool Ecosystem]
-    end
-
-    subgraph "Storage Backends"
-        FS[FileSystem<br/>Hierarchical Storage]
-        SQL[SQLite<br/>Relational Database]
-        LMDB[LMDB<br/>High-Performance KV Store]
-        MEM[Memory<br/>In-Memory Cache]
-        REDIS[Redis<br/>Distributed Cache]
-    end
-
-    subgraph "Core Neogenesis System"
-        MC[MainController]
-        MAB[MABConverger]
-        TR[ToolRegistry]
-    end
-
-    PS --> FS & SQL & LMDB & MEM & REDIS
-    SM --> PS
-    DS --> SM
-    AC --> SM & EE
-    CO --> AC & DS
-    AD --> CO & TO
-    MC --> AD
-    MAB --> SM
-    TR --> TO
-
-    style PS fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style SM fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style DS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 🏛️ Enterprise-Grade Persistent Storage Engine
+### Configuration
 
-**`persistent_storage.py`** - Advanced multi-backend storage system with enterprise features:
+Create a `.env` file in the project root:
 
-#### Storage Backend Support
-- **🗄️ SQLite**: Relational database with ACID transactions and complex queries
-- **⚡ LMDB**: Lightning-fast memory-mapped database for high-performance scenarios
-- **📁 FileSystem**: Hierarchical file-based storage with versioning and backup
-- **💾 Memory**: In-memory storage for testing and caching
-- **🔄 Redis**: Distributed caching and session storage (future enhancement)
+```bash
+# Configure one or more LLM providers (system auto-detects available ones)
+DEEPSEEK_API_KEY="your_deepseek_api_key"
+OPENAI_API_KEY="your_openai_api_key"  
+ANTHROPIC_API_KEY="your_anthropic_api_key"
 
-#### Advanced Features
-- **🔐 Data Security**: Built-in encryption, checksums, and data integrity validation
-- **📋 Version Control**: Automatic versioning with configurable retention policies
-- **🗜️ Compression**: Multiple compression algorithms (GZIP, LZMA) for storage optimization
-- **🔄 Backup & Recovery**: Automated backup scheduling and point-in-time recovery
-- **📊 Metadata Management**: Rich metadata tracking with access patterns and performance metrics
+```
+
+---
+
+## 🎯 Usage Examples
+
+### Quick Demo
+
+```bash
+# Launch demo menu
+python start_demo.py
+
+# Quick simulation demo (no API key needed)
+python quick_demo.py
+
+# Full interactive demo  
+python run_demo.py
+```
+
+### Basic Usage
 
 ```python
-# Enterprise storage configuration example
-from neogenesis_system.langchain_integration.persistent_storage import (
-    create_storage_engine, StorageConfig, StorageBackend, CompressionType
+from neogenesis_system.core.neogenesis_planner import NeogenesisPlanner
+from neogenesis_system.cognitive_engine.reasoner import PriorReasoner
+from neogenesis_system.cognitive_engine.path_generator import PathGenerator  
+from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+
+# Initialize components
+planner = NeogenesisPlanner(
+    prior_reasoner=PriorReasoner(),
+    path_generator=PathGenerator(),
+    mab_converger=MABConverger()
 )
 
-# Configure enterprise-grade storage
-config = StorageConfig(
-    backend=StorageBackend.LMDB,  # High-performance backend
-    compression=CompressionType.GZIP,  # Space optimization
-    enable_encryption=True,  # Data security
-    enable_versioning=True,  # Change tracking
-    enable_backup=True,  # Data protection
-    max_versions=50,  # Version retention
-    backup_interval=1800  # 30-minute backups
+# Create a decision plan
+plan = planner.create_plan(
+    query="Design a scalable microservices architecture",
+    memory=None,
+    context={"domain": "system_design", "complexity": "high"}
 )
 
-# Create storage engine
-storage = create_storage_engine(config=config)
-
-# Store complex decision state
-decision_state = {
-    "session_id": "decision_session_001",
-    "thinking_paths": [
-        {"path_id": 1, "confidence": 0.85, "reasoning": "Technical feasibility analysis..."},
-        {"path_id": 2, "confidence": 0.92, "reasoning": "Market opportunity assessment..."}
-    ],
-    "mab_weights": {"exploration": 0.3, "exploitation": 0.7},
-    "context": {"domain": "cloud_architecture", "complexity": "high"}
-}
-
-# Store with automatic versioning and backup
-storage.store("decision_state_session_001", decision_state)
-
-# Retrieve with metadata
-retrieved_state = storage.retrieve("decision_state_session_001")
-metadata = storage.get_metadata("decision_state_session_001")
-print(f"Version: {metadata.version}, Size: {metadata.size} bytes")
+print(f"Plan: {plan.thought}")
+print(f"Actions: {len(plan.actions)}")
 ```
 
-### 🔄 Advanced State Management & Transactions
+---
 
-**`state_management.py`** & **`state_transactions.py`** - Professional state management with ACID properties:
+## 🚀 Performance
 
-#### Transaction Support
-- **⚛️ Atomic Operations**: All-or-nothing state changes ensuring consistency
-- **🔒 Isolation**: Concurrent state modifications handled safely
-- **💾 Durability**: State changes persisted reliably across system restarts
-- **🔄 Rollback Capability**: Undo complex state changes when errors occur
+| Metric | Performance | Description |
+|--------|-------------|-------------|
+| 🎯 Decision Accuracy | 85%+ | Based on validation data |
+| ⚡ Response Time | 2-5 sec | Full five-stage process |
+| 🧠 Path Generation | 95%+ | Success rate |
+| 💡 Innovation Rate | 15%+ | Aha-moment breakthroughs |
+| 🔧 Tool Integration | 92%+ | Success rate |
+| 🤖 Multi-LLM Reliability | 99%+ | Provider failover |
 
-#### State Features
-- **📍 Checkpointing**: Save decision progress at key milestones
-- **🔀 Branch Management**: Parallel exploration of decision paths
-- **📈 State Analytics**: Performance metrics and access pattern analysis
-- **🌐 Context Inheritance**: Hierarchical context passing between chains
+---
 
-```python
-from neogenesis_system.langchain_integration.state_management import StateManager
-from neogenesis_system.langchain_integration.state_transactions import TransactionManager
+## 📄 License
 
-# Initialize professional state management
-state_manager = StateManager(storage_backend="lmdb")
-tx_manager = TransactionManager(state_manager)
+MIT License - see [LICENSE](LICENSE) file.
 
-# Execute complex state changes with transactions
-with tx_manager.transaction() as tx:
-    # Update multiple decision paths atomically
-    tx.update_decision_path("path_1", {"confidence": 0.88, "verified": True})
-    tx.update_decision_path("path_2", {"confidence": 0.76, "verified": False})
-    tx.update_mab_weights({"thompson_sampling": 0.6, "ucb": 0.4})
-    
-    # Validate state consistency
-    if tx.validate_state_consistency():
-        tx.commit()  # All changes applied atomically
-    else:
-        tx.rollback()  # All changes discarded
-```
+---
 
-### 🌐 Distributed State Coordination
+## 🙏 Acknowledgments
 
-**`distributed_state.py`** - Multi-node state synchronization for enterprise deployment:
+- **OpenAI, Anthropic, DeepSeek**: LLM providers
+- **LangChain**: Tool ecosystem inspiration  
+- **Multi-Armed Bandit Theory**: Algorithmic foundation
+- **Metacognitive Theory**: Architecture inspiration
+
+---
+
+## 📞 Contact
+
+**Email**: answeryt@qq.com
+
+---
+
+<div align="center">
+
+**🌟 If this project helps you, please give us a Star!**
+
+## Making AI Think Like Experts, Decide More Wisely
 
 #### Distributed Features
 - **🔗 Node Coordination**: Synchronize state across multiple Neogenesis instances

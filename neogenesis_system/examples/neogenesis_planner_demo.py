@@ -31,11 +31,11 @@ try:
     )
     
     # 导入Meta MAB组件
-    from neogenesis_system.meta_mab.reasoner import PriorReasoner
-    from neogenesis_system.meta_mab.path_generator import PathGenerator
-    from neogenesis_system.meta_mab.mab_converger import MABConverger
-    from neogenesis_system.meta_mab.llm_manager import LLMManager
-    from neogenesis_system.meta_mab.utils.tool_abstraction import global_tool_registry
+    from neogenesis_system.cognitive_engine.reasoner import PriorReasoner
+    from neogenesis_system.cognitive_engine.path_generator import PathGenerator
+    from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+    from neogenesis_system.providers.llm_manager import LLMManager
+    from neogenesis_system.tools.tool_abstraction import global_tool_registry
     
 except ImportError as e:
     print(f"❌ 导入错误: {e}")
@@ -319,7 +319,7 @@ class MockPathGenerator:
     """模拟路径生成器"""
     
     def generate_paths(self, thinking_seed: str, task: str, max_paths: int = 6) -> List:
-        from neogenesis_system.meta_mab.data_structures import ReasoningPath
+        from neogenesis_system.cognitive_engine.data_structures import ReasoningPath
         
         paths = []
         for i in range(min(3, max_paths)):
