@@ -418,70 +418,76 @@ Neogenesis System adopts a highly modular and extensible architectural design wh
 ```mermaid
 graph TD
     subgraph "Launch & Demo Layer"
-        UI[start_demo.py / interactive_demo.py]
+        UI["Demo & Interactive Interface"]
     end
 
     subgraph "Core Control Layer"
-        MC[MainController<br/><b>(controller.py)</b><br/>Five-stage Process Coordination]
+        MC["MainController - Five-stage Process Coordination"]
     end
 
     subgraph "LangChain Integration Layer"
-        LC_AD[LangChain Adapters<br/><b>(adapters.py)</b><br/>LangChain Compatibility]
-        LC_PS[PersistentStorage<br/><b>(persistent_storage.py)</b><br/>Multi-Backend Storage]
-        LC_SM[StateManagement<br/><b>(state_management.py)</b><br/>ACID Transactions]
-        LC_DS[DistributedState<br/><b>(distributed_state.py)</b><br/>Multi-Node Sync]
-        LC_AC[AdvancedChains<br/><b>(advanced_chains.py)</b><br/>Chain Workflows]
-        LC_EE[ExecutionEngines<br/><b>(execution_engines.py)</b><br/>Parallel Processing]
-        LC_CO[Coordinators<br/><b>(coordinators.py)</b><br/>Chain Coordination]
-        LC_TO[LangChain Tools<br/><b>(tools.py)</b><br/>Extended Tool Library]
+        LC_AD["LangChain Adapters - LangChain Compatibility"]
+        LC_PS["PersistentStorage - Multi-Backend Storage"]
+        LC_SM["StateManagement - ACID Transactions"]
+        LC_DS["DistributedState - Multi-Node Sync"]
+        LC_AC["AdvancedChains - Chain Workflows"]
+        LC_EE["ExecutionEngines - Parallel Processing"]
+        LC_CO["Coordinators - Chain Coordination"]
+        LC_TO["LangChain Tools - Extended Tool Library"]
     end
 
     subgraph "Decision Logic Layer"
-        PR[PriorReasoner<br/><b>(reasoner.py)</b><br/>Quick Heuristic Analysis]
-        RAG[RAGSeedGenerator<br/><b>(rag_seed_generator.py)</b><br/>RAG-Enhanced Seed Generation]
-        PG[PathGenerator<br/><b>(path_generator.py)</b><br/>Multi-path Thinking Generation]
-        MAB[MABConverger<br/><b>(mab_converger.py)</b><br/>Meta-MAB & Learning]
+        PR["PriorReasoner - Quick Heuristic Analysis"]
+        RAG["RAGSeedGenerator - RAG-Enhanced Seed Generation"]
+        PG["PathGenerator - Multi-path Thinking Generation"]
+        MAB["MABConverger - Meta-MAB & Learning"]
     end
 
     subgraph "Tool Abstraction Layer"
-        TR[ToolRegistry<br/><b>(tool_abstraction.py)</b><br/>Unified Tool Management]
-        WST[WebSearchTool<br/><b>(search_tools.py)</b><br/>Web Search Tool]
-        IVT[IdeaVerificationTool<br/><b>(search_tools.py)</b><br/>Idea Verification Tool]
+        TR["ToolRegistry - Unified Tool Management"]
+        WST["WebSearchTool - Web Search Tool"]
+        IVT["IdeaVerificationTool - Idea Verification Tool"]
     end
 
     subgraph "Tools & Services Layer"
-        LLM[LLMManager<br/><b>(llm_manager.py)</b><br/>Multi-LLM Provider Management]
-        SC[SearchClient<br/><b>(search_client.py)</b><br/>Web Search & Verification]
-        PO[PerformanceOptimizer<br/><b>(performance_optimizer.py)</b><br/>Parallelization & Caching]
-        CFG[config.py<br/><b>(Main/Demo Configuration)</b>]
+        LLM["LLMManager - Multi-LLM Provider Management"]
+        SC["SearchClient - Web Search & Verification"]
+        PO["PerformanceOptimizer - Parallelization & Caching"]
+        CFG["Configuration - Main/Demo Configuration"]
     end
 
     subgraph "Storage Backends"
-        FS[FileSystem<br/>Versioned Storage]
-        SQL[SQLite<br/>ACID Database]
-        LMDB[LMDB<br/>High-Performance KV]
-        MEM[Memory<br/>In-Memory Cache]
-        REDIS[Redis<br/>Distributed Cache]
+        FS["FileSystem - Versioned Storage"]
+        SQL["SQLite - ACID Database"]
+        LMDB["LMDB - High-Performance KV"]
+        MEM["Memory - In-Memory Cache"]
+        REDIS["Redis - Distributed Cache"]
     end
 
     subgraph "LLM Providers Layer"
-        OAI[OpenAI<br/>GPT-3.5/4/4o]
-        ANT[Anthropic<br/>Claude-3 Series]
-        DS[DeepSeek<br/>deepseek-chat/coder]
-        OLL[Ollama<br/>Local Models]
-        AZ[Azure OpenAI<br/>Enterprise Models]
+        OAI["OpenAI - GPT-3.5/4/4o"]
+        ANT["Anthropic - Claude-3 Series"]
+        DS["DeepSeek - deepseek-chat/coder"]
+        OLL["Ollama - Local Models"]
+        AZ["Azure OpenAI - Enterprise Models"]
     end
 
     UI --> MC
     MC --> LC_AD
     LC_AD --> LC_CO
-    LC_CO --> LC_AC & LC_EE
+    LC_CO --> LC_AC
+    LC_CO --> LC_EE
     LC_AC --> LC_SM
     LC_SM --> LC_PS
     LC_DS --> LC_SM
-    LC_PS --> FS & SQL & LMDB & MEM & REDIS
+    LC_PS --> FS
+    LC_PS --> SQL
+    LC_PS --> LMDB
+    LC_PS --> MEM
+    LC_PS --> REDIS
     
-    MC --> PR & RAG
+    MC --> PR
+    MC --> RAG
     MC --> PG
     MC --> MAB
     MC --> TR
@@ -491,14 +497,19 @@ graph TD
     RAG --> LLM
     PG --> LLM
     MAB --> PG
-    MC -- "Uses" --> PO
-    TR --> WST & IVT
+    MC --> PO
+    TR --> WST
+    TR --> IVT
     TR --> LC_TO
     WST --> SC
     IVT --> SC
-    LLM --> OAI & ANT & DS & OLL & AZ
+    LLM --> OAI
+    LLM --> ANT
+    LLM --> DS
+    LLM --> OLL
+    LLM --> AZ
 
-    style LC_AD fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style LC_AD fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     style LC_PS fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     style LC_SM fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     style LC_DS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
@@ -578,55 +589,55 @@ graph TD
 
 1. **Clone Repository**
 
-   ```bash
-   git clone https://github.com/your-repo/neogenesis-system.git
-   cd neogenesis-system
-   ```
+    ```bash
+    git clone https://github.com/your-repo/neogenesis-system.git
+    cd neogenesis-system
+    ```
 
 2. **Install Dependencies**
 
-   ```bash
-   # (Recommended) Create and activate virtual environment
-   python -m venv venv
-   source venv/bin/activate  # on Windows: venv\Scripts\activate
+    ```bash
+    # (Recommended) Create and activate virtual environment
+    python -m venv venv
+    source venv/bin/activate  # on Windows: venv\Scripts\activate
 
-   # Install core dependencies
-   pip install -r requirements.txt
-   
-   # (Optional) Install additional LLM provider libraries for enhanced functionality
-   pip install openai        # For OpenAI GPT models
-   pip install anthropic     # For Anthropic Claude models
-   # Note: DeepSeek support is included in core dependencies
-   
-   # (Optional) Install LangChain integration dependencies for advanced features
-   pip install langchain langchain-community  # Core LangChain integration
-   pip install lmdb                           # High-performance LMDB storage
-   pip install redis                          # Distributed caching and state
-   pip install sqlalchemy                     # Enhanced SQL operations
-   pip install aioredis                       # Async Redis for distributed coordination
-   ```
+    # Install core dependencies
+    pip install -r requirements.txt
+    
+    # (Optional) Install additional LLM provider libraries for enhanced functionality
+    pip install openai        # For OpenAI GPT models
+    pip install anthropic     # For Anthropic Claude models
+    # Note: DeepSeek support is included in core dependencies
+    
+    # (Optional) Install LangChain integration dependencies for advanced features
+    pip install langchain langchain-community  # Core LangChain integration
+    pip install lmdb                           # High-performance LMDB storage
+    pip install redis                          # Distributed caching and state
+    pip install sqlalchemy                     # Enhanced SQL operations
+    pip install aioredis                       # Async Redis for distributed coordination
+    ```
 
 3. **Configure API Keys (Optional but Recommended)**
 
-   Create a `.env` file in the project root directory and configure your preferred LLM provider API keys:
+    Create a `.env` file in the project root directory and configure your preferred LLM provider API keys:
 
-   ```bash
-   # Configure one or more LLM providers (the system will auto-detect available ones)
-   DEEPSEEK_API_KEY="your_deepseek_api_key"
-   OPENAI_API_KEY="your_openai_api_key"
-   ANTHROPIC_API_KEY="your_anthropic_api_key"
-   
-   # For Azure OpenAI (optional)
-   AZURE_OPENAI_API_KEY="your_azure_openai_key"
-   AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-   ```
+    ```bash
+    # Configure one or more LLM providers (the system will auto-detect available ones)
+    DEEPSEEK_API_KEY="your_deepseek_api_key"
+    OPENAI_API_KEY="your_openai_api_key"
+    ANTHROPIC_API_KEY="your_anthropic_api_key"
+    
+    # For Azure OpenAI (optional)
+    AZURE_OPENAI_API_KEY="your_azure_openai_key"
+    AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+    ```
 
-   **Note**: You only need to configure at least one provider. The system automatically:
-   - Detects available providers based on configured API keys
-   - Selects the best available provider automatically
-   - Falls back to other providers if the primary one fails
-   
-   Without any keys, the system will run in limited simulation mode.
+    **Note**: You only need to configure at least one provider. The system automatically:
+    - Detects available providers based on configured API keys
+    - Selects the best available provider automatically
+    - Falls back to other providers if the primary one fails
+
+    Without any keys, the system will run in limited simulation mode.
 
 ### 🎭 Demo Experience
 
@@ -1081,21 +1092,6 @@ This project is open-sourced under the MIT License. See [LICENSE](LICENSE) file 
 
 ---
 
-## 🙏 Acknowledgments
-
-### Core Technology Acknowledgments
-
-- **LangChain**: Revolutionary framework for building LLM-powered applications that inspired our comprehensive integration architecture
-- **OpenAI**: Pioneering GPT models and API standards that inspired our universal interface design
-- **Anthropic**: Advanced Claude models with superior reasoning capabilities
-- **DeepSeek AI**: Cost-effective models with excellent coding and multilingual support
-- **Ollama**: Enabling local and privacy-focused AI deployments
-- **LMDB**: Lightning-fast memory-mapped database enabling high-performance persistent storage
-- **Redis**: Distributed caching and state management for enterprise scalability
-- **Multi-Armed Bandit Theory**: Providing algorithmic foundation for intelligent decision-making
-- **RAG Technology**: Enabling knowledge-enhanced thinking generation
-- **Metacognitive Theory**: Inspiring the overall system architecture design
-
 ### Development Team
 
 Neogenesis System is independently developed by the author.
@@ -1138,4 +1134,3 @@ Neogenesis System is independently developed by the author.
 [🚀 Get Started](#-quick-start) | [📖 View Documentation](docs/) | [💡 Suggest Ideas](../../issues/new)
 
 </div>
-
