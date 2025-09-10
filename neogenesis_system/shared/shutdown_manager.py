@@ -103,10 +103,7 @@ class SystemShutdownManager:
             # 性能优化统计
             if hasattr(controller, 'performance_optimizer') and controller.performance_optimizer:
                 opt_report = controller.performance_optimizer.get_performance_report()
-                # 添加 None 检查
                 cache_stats = opt_report.get('cache_stats', {})
-                if cache_stats is None:
-                    cache_stats = {}
                 if cache_stats.get('total_requests', 0) > 0:
                     logger.info(f"   - 缓存命中率: {cache_stats.get('hit_rate', 0):.1%}")
                     logger.info(f"   - 缓存请求数: {cache_stats.get('total_requests', 0)}")
