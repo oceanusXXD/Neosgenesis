@@ -341,6 +341,12 @@ class DynamicPathLibrary:
     def _load_from_json(self):
         """从JSON文件加载路径"""
         try:
+            # 检查文件是否存在且不为空
+            json_path_obj = Path(self.json_path)
+            if not json_path_obj.exists() or json_path_obj.stat().st_size == 0:
+                logger.info(f"📝 JSON文件 '{self.json_path}' 不存在或为空，跳过加载。")
+                return
+
             with open(self.json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
@@ -372,9 +378,12 @@ class DynamicPathLibrary:
                     logger.warning(f"⚠️ 跳过损坏的路径记录 {path_id}: {e}")
         
         except FileNotFoundError:
-            logger.info("📝 JSON文件不存在，创建新的空库")
+            logger.info(f"📝 JSON文件 '{self.json_path}' 不存在，创建新的空库。")
         except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON文件格式错误: {e}")
+            logger.error(f"❌ JSON文件 '{self.json_path}' 格式错误或为空: {e}")
+            # 这里可以选择性地备份损坏的文件并重新初始化
+            # os.rename(self.json_path, f"{self.json_path}.broken.{int(time.time())}")
+            # self._init_json_storage()
     
     def add_path(self, path: Union[ReasoningPath, EnhancedReasoningPath]) -> bool:
         """
