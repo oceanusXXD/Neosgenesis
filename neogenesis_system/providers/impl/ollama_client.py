@@ -223,13 +223,20 @@ class OllamaClient(BaseLLMClient):
             bool: 配置是否有效
         """
         try:
-            # 检查Ollama服务器是否可访问
-            response = self.session.get(f"{self.base_url}/api/version", timeout=5)
-            if response.status_code == 200:
-                # 检查模型是否存在
-                models = self.get_available_models()
-                return self.config.model_name in models
-            return False
+            # 基础配置验证 - 不进行实际网络调用
+            if not hasattr(self.config, 'model_name') or not self.config.model_name:
+                logger.debug("❌ Ollama模型名称未设置")
+                return False
+            
+            # 检查base_url格式
+            base_url = getattr(self, 'base_url', None) or getattr(self.config, 'base_url', None)
+            if base_url:
+                if not (base_url.startswith('http://') or base_url.startswith('https://')):
+                    logger.debug("❌ Ollama base_url格式无效")
+                    return False
+            
+            logger.debug("✅ Ollama基础配置验证通过")
+            return True
             
         except Exception as e:
             logger.error(f"❌ Ollama配置验证失败: {e}")

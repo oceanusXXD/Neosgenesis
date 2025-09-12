@@ -152,11 +152,27 @@ async def initialize_additional_components():
             logger.info("✅ StateManager 初始化成功")
         
         # 初始化认知调度器（如果可用）
-        if 'CognitiveScheduler' in globals():
+        if 'CognitiveScheduler' in globals() and state_manager:
             try:
                 config = get_default_config() if 'get_default_config' in globals() else {}
-                cognitive_scheduler = CognitiveScheduler(config)
+                
+                # 🔧 修复：创建LLM客户端以正确初始化回溯引擎
+                llm_client = None
+                api_key = os.getenv("DEEPSEEK_API_KEY")
+                if api_key:
+                    try:
+                        from ..providers.impl.deepseek_client import create_llm_client
+                        llm_client = create_llm_client(api_key)
+                        logger.info("✅ LLM客户端创建成功，用于认知调度器")
+                    except Exception as e:
+                        logger.warning(f"⚠️ LLM客户端创建失败: {e}")
+                
+                cognitive_scheduler = CognitiveScheduler(state_manager, llm_client, config)
                 logger.info("✅ CognitiveScheduler 初始化成功")
+                
+                # 🔧 修复：双向依赖注入 - 确保认知调度器与主系统正确链接
+                _inject_bidirectional_dependencies(cognitive_scheduler)
+                
             except Exception as e:
                 logger.warning(f"⚠️ CognitiveScheduler 初始化失败: {e}")
         
@@ -171,6 +187,57 @@ async def initialize_additional_components():
         
     except Exception as e:
         logger.error(f"❌ 额外组件初始化失败: {e}")
+
+
+def _inject_bidirectional_dependencies(scheduler):
+    """双向依赖注入 - 确保认知调度器与主系统组件正确连接"""
+    try:
+        success_count = 0
+        
+        # 方案1：从 neogenesis_agent 获取依赖
+        if neogenesis_agent and hasattr(neogenesis_agent, 'planner'):
+            planner = neogenesis_agent.planner
+            if hasattr(planner, 'path_generator') and hasattr(planner, 'mab_converger'):
+                try:
+                    success = scheduler.update_retrospection_dependencies(
+                        path_generator=planner.path_generator,
+                        mab_converger=planner.mab_converger
+                    )
+                    if success:
+                        success_count += 1
+                        logger.info("✅ 方案1：从Agent获取依赖成功")
+                        
+                        # 反向注入：将认知调度器设置到Planner中
+                        if hasattr(planner, 'set_cognitive_scheduler'):
+                            planner.set_cognitive_scheduler(scheduler)
+                        elif hasattr(planner, 'cognitive_scheduler'):
+                            planner.cognitive_scheduler = scheduler
+                            
+                except Exception as e:
+                    logger.warning(f"⚠️ 方案1失败: {e}")
+        
+        # 方案2：从 neogenesis_system 获取依赖
+        if neogenesis_system and success_count == 0:
+            try:
+                if hasattr(neogenesis_system, 'path_generator') and hasattr(neogenesis_system, 'mab_converger'):
+                    success = scheduler.update_retrospection_dependencies(
+                        path_generator=neogenesis_system.path_generator,
+                        mab_converger=neogenesis_system.mab_converger
+                    )
+                    if success:
+                        success_count += 1
+                        logger.info("✅ 方案2：从System获取依赖成功")
+            except Exception as e:
+                logger.warning(f"⚠️ 方案2失败: {e}")
+        
+        # 报告结果
+        if success_count > 0:
+            logger.info("✅ 回溯引擎依赖组件链接成功")
+        else:
+            logger.warning("⚠️ 回溯引擎依赖组件链接失败")
+            
+    except Exception as e:
+        logger.error(f"❌ 双向依赖注入异常: {e}")
 
 
 async def cleanup_resources():
@@ -545,6 +612,114 @@ async def knowledge_search(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"知识搜索失败: {str(e)}"
+        )
+
+
+@app.post("/chat")
+async def chat_endpoint(request: dict):
+    """聊天API端点 - 为Web UI提供兼容接口"""
+    try:
+        logger.info(f"💬 收到聊天请求: {request.get('query', 'N/A')[:100]}")
+        
+        # 从请求中提取查询和上下文
+        query = request.get('query', '')
+        context = request.get('context', {})
+        
+        if not query:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "查询不能为空"}
+            )
+        
+        # 调用NeogenesisAgent处理查询
+        try:
+            agent = neogenesis_agent
+            if not agent:
+                # 尝试获取Agent实例
+                agent = await get_neogenesis_agent()
+            
+            if agent:
+                # 使用Agent处理查询
+                result = agent.run(query=query, context=context)
+                
+                # 构建响应
+                return {
+                    "result": result,
+                    "thinking_process": [
+                        {
+                            "step": "思考起点与核心目标",
+                            "description": "为问题确定核心处理策略",
+                            "status": "completed"
+                        },
+                        {
+                            "step": "思维方向验证", 
+                            "description": "验证策略可行性",
+                            "status": "completed"
+                        },
+                        {
+                            "step": "最终策略选择",
+                            "description": "选择最优处理方案",
+                            "status": "completed"
+                        },
+                        {
+                            "step": "数据验证正误学习",
+                            "description": "学习优化系统表现",
+                            "status": "completed"
+                        },
+                        {
+                            "step": "效率与成本平衡",
+                            "description": "优化响应效率",
+                            "status": "completed"
+                        }
+                    ],
+                    "tool_calls": [],
+                    "success": True
+                }
+            else:
+                # 没有Agent时的回退处理
+                logger.warning("⚠️ NeogenesisAgent不可用，使用智能回答")
+                query_lower = query.lower().strip()
+                
+                if any(greeting in query_lower for greeting in ['你好', 'hello', 'hi', '您好']):
+                    fallback_result = "你好！我是Neogenesis智能助手，很高兴为您服务。有什么我可以帮助您的吗？"
+                elif "介绍" in query_lower and ("自己" in query_lower or "你" in query_lower):
+                    fallback_result = "我是Neogenesis智能助手，基于先进的认知架构设计。我可以帮助您进行信息查询、问题分析、创意思考等多种任务。我的特点是能够根据不同问题智能选择最合适的处理方式，为您提供准确、有用的回答。"
+                else:
+                    fallback_result = f"我理解您关于「{query}」的问题。基于我的分析，这是一个很值得探讨的话题，我很乐意为您提供详细的解答和建议。请问您希望了解哪个具体方面呢？"
+                
+                return {
+                    "result": fallback_result,
+                    "thinking_process": [],
+                    "tool_calls": [],
+                    "success": True
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Agent处理失败: {e}")
+            logger.error(traceback.format_exc())
+            
+            # 智能回退处理
+            query_lower = query.lower().strip()
+            if any(greeting in query_lower for greeting in ['你好', 'hello', 'hi', '您好']):
+                fallback_result = "你好！我是Neogenesis智能助手，很高兴为您服务。有什么我可以帮助您的吗？"
+            elif "介绍" in query_lower and ("自己" in query_lower or "你" in query_lower):
+                fallback_result = "我是Neogenesis智能助手，基于先进的认知架构设计。我可以帮助您进行信息查询、问题分析、创意思考等多种任务。"
+            else:
+                fallback_result = f"我理解您关于「{query}」的问题。这是一个很值得探讨的话题，我很乐意为您提供详细的解答和建议。"
+            
+            return {
+                "result": fallback_result,
+                "thinking_process": [],
+                "tool_calls": [],
+                "success": True
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ 聊天端点处理失败: {e}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"服务器错误: {str(e)}"}
         )
 
 

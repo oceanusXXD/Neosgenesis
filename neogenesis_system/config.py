@@ -8,7 +8,7 @@ Configuration file - stores all system configurations
 
 # ==================== 传统DeepSeek API配置（向后兼容） ====================
 # 注意：这些常量保留用于向后兼容，新代码应使用LLM_PROVIDERS_CONFIG
-DEEPSEEK_API_BASE = "https://api.deepseek.com/v1"
+DEEPSEEK_API_BASE = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"
 DEEPSEEK_CHAT_ENDPOINT = "https://api.deepseek.com/chat/completions"
 

@@ -941,16 +941,40 @@ class ReasoningPathTemplates:
         """
         templates = {}
         
-        # 获取所有激活状态的路径
+        # 🔧 根源修复：首先检查动态路径库状态
         all_paths = self.path_library.get_all_paths(include_retired=False)
+        logger.debug(f"🔍 动态路径库状态: {len(all_paths)} 个路径")
+        
+        if not all_paths:
+            logger.warning("⚠️ 动态路径库为空，直接返回静态模板")
+            return self._get_static_templates()
         
         for path_id, enhanced_path in all_paths.items():
-            # 转换为标准ReasoningPath对象
-            reasoning_path = enhanced_path.to_reasoning_path()
-            
-            # 使用strategy_id作为模板键，保持一致性
-            template_key = enhanced_path.strategy_id or path_id
-            templates[template_key] = reasoning_path
+            try:
+                # 转换为标准ReasoningPath对象
+                reasoning_path = enhanced_path.to_reasoning_path()
+                
+                # 🔧 根源修复：正确的键名映射逻辑
+                # 需要保证键名与路径选择器的期望一致
+                if enhanced_path.strategy_id and not enhanced_path.strategy_id.endswith('_v1'):
+                    # 如果strategy_id不带版本后缀，直接使用
+                    template_key = enhanced_path.strategy_id
+                else:
+                    # 从path_id中提取策略名（去掉版本后缀）
+                    template_key = path_id.replace('_v1', '') if '_v1' in path_id else path_id
+                
+                templates[template_key] = reasoning_path
+                logger.debug(f"✅ 模板映射: {template_key} -> {reasoning_path.path_type}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ 转换路径模板失败 {path_id}: {e}")
+        
+        logger.info(f"✅ 成功加载 {len(templates)} 个路径模板: {list(templates.keys())}")
+        
+        # 🔧 如果转换后仍为空，返回静态模板
+        if not templates:
+            logger.warning("⚠️ 路径模板转换后为空，返回静态模板")
+            return self._get_static_templates()
         
         return templates
     
@@ -1524,7 +1548,10 @@ class PathGenerator:
                     'adaptive_requirement': llm_analysis.get('characteristics', {}).get('adaptive_requirement', False),
                     
                     # 兼容性字段：模拟keywords_found格式
-                    'keywords_found': self._convert_relevance_to_keywords(llm_analysis.get('path_relevance', {}))
+                    'keywords_found': self._convert_relevance_to_keywords(llm_analysis.get('path_relevance', {})),
+                    
+                    # 标记分析来源
+                    'analysis_source': 'llm'
                 }
                 
                 return analysis
@@ -1613,7 +1640,9 @@ class PathGenerator:
         """
         # 🗑️ 已删除所有启发式规则，直接使用默认分析
         logger.info("🔄 LLM不可用，使用默认均匀分配策略")
-        return self._get_default_analysis()
+        result = self._get_default_analysis()
+        result['analysis_source'] = 'heuristic'
+        return result
     
     def _create_fallback_analysis(self, raw_response: str) -> Dict[str, Any]:
         """
@@ -1626,7 +1655,9 @@ class PathGenerator:
             默认分析结果
         """
         error_note = f"LLM分析失败，使用默认设置，原始响应长度: {len(raw_response)}"
-        return self._get_default_analysis(error_note)
+        result = self._get_default_analysis(error_note)
+        result['analysis_source'] = 'fallback'
+        return result
     
     def _select_path_types(self, seed_analysis: Dict[str, Any], max_paths: int) -> List[str]:
         """
@@ -1713,6 +1744,24 @@ class PathGenerator:
         """
         reasoning_paths = []
         
+            # 🔧 修复：如果路径模板为空，强制重新加载
+        if not self.path_templates:
+            logger.warning("⚠️ 检测到空的路径模板，尝试重新加载...")
+            self.path_templates = self.path_template_manager.get_all_templates()
+            
+            # 如果仍然为空，使用静态回退模板
+            if not self.path_templates:
+                logger.warning("⚠️ 动态路径库加载失败，使用静态回退模板...")
+                static_templates = self.path_template_manager._get_static_templates()
+                # 🔧 确保键名匹配：同时使用原始键和策略ID作为键
+                self.path_templates = {}
+                for key, template in static_templates.items():
+                    self.path_templates[key] = template
+                    # 如果有不同的strategy_id，也添加为键
+                    if template.strategy_id and template.strategy_id != key:
+                        self.path_templates[template.strategy_id] = template
+                logger.info(f"✅ 静态回退模板已加载: {len(static_templates)} 个模板，{len(self.path_templates)} 个键")
+            
         for path_type in path_types:
             if path_type in self.path_templates:
                 template = self.path_templates[path_type]

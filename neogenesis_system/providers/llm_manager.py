@@ -115,7 +115,7 @@ class LLMManager:
                 llm_config = self._create_llm_config(provider_name, provider_config, api_key)
                 
                 # 创建客户端
-                client = create_llm_client(llm_config.provider, llm_config)
+                client = create_llm_client(llm_config.api_key)
                 
                 # 快速健康检查
                 if self._quick_health_check(client, provider_name):
@@ -491,3 +491,27 @@ class LLMManager:
         
         self.last_health_check = current_time
         return results
+
+         d e f   g e n e r a t e _ r e s p o n s e ( s e l f ,   q u e r y :   s t r ,   p r o v i d e r :   s t r   =   ' d e e p s e e k ' ,   * * k w a r g s )   - >   s t r : 
+                 \ 
+ 
+ \ \ ub�T�^
+ 
+ - 
+ 
+ N�eHrA P I |Q�[�v�e�l\ \ \ 
+                 t r y : 
+                         f r o m   . l l m _ b a s e   i m p o r t   L L M M e s s a g e 
+                         m e s s a g e s   =   [ L L M M e s s a g e ( r o l e = ' u s e r ' ,   c o n t e n t = q u e r y ) ] 
+                         r e s p o n s e   =   s e l f . c h a t _ c o m p l e t i o n ( 
+                                 m e s s a g e s = m e s s a g e s , 
+                                 p r o v i d e r = p r o v i d e r , 
+                                 * * k w a r g s 
+                         ) 
+                         r e t u r n   r e s p o n s e . c o n t e n t 
+                 e x c e p t   E x c e p t i o n   a s   e : 
+                         l o g g e r . e r r o r ( f '   ub�T�^1Y%�:   { e } ' ) 
+                         r e t u r n   f ' �bIk�ub�T�^�e�Q�s��:   { s t r ( e ) } ' 
+ 
+ 
+ 

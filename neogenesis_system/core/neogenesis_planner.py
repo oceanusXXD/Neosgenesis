@@ -91,6 +91,10 @@ class NeogenesisPlanner(BasePlanner):
         # 🧠 认知调度器集成
         self.cognitive_scheduler = cognitive_scheduler
         
+        # 🔧 如果认知调度器存在，尝试注入回溯引擎依赖
+        if self.cognitive_scheduler:
+            self._inject_cognitive_dependencies()
+        
         # 内部状态
         self.total_rounds = 0
         self.decision_history = []
@@ -111,6 +115,32 @@ class NeogenesisPlanner(BasePlanner):
             logger.info(f"   工具注册表: {tool_count} 个工具")
         except:
             logger.info(f"   工具注册表: 已初始化")
+    
+    def _inject_cognitive_dependencies(self):
+        """向认知调度器注入核心依赖组件"""
+        try:
+            if (self.cognitive_scheduler and 
+                hasattr(self.cognitive_scheduler, 'update_retrospection_dependencies')):
+                
+                success = self.cognitive_scheduler.update_retrospection_dependencies(
+                    path_generator=self.path_generator,
+                    mab_converger=self.mab_converger
+                )
+                
+                if success:
+                    logger.info("✅ 回溯引擎依赖组件已成功注入")
+                else:
+                    logger.warning("⚠️ 回溯引擎依赖组件注入失败")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ 认知调度器依赖注入异常: {e}")
+    
+    def set_cognitive_scheduler(self, cognitive_scheduler):
+        """设置认知调度器并自动注入依赖组件"""
+        self.cognitive_scheduler = cognitive_scheduler
+        if cognitive_scheduler:
+            self._inject_cognitive_dependencies()
+            logger.info("🧠 认知调度器已设置并完成依赖注入")
     
     def create_plan(self, query: str, memory: Any, context: Optional[Dict[str, Any]] = None) -> Plan:
         """
@@ -422,8 +452,10 @@ class NeogenesisPlanner(BasePlanner):
         """
         翻译层：将Neogenesis决策结果转换为标准Plan格式
         
-        这是适配新架构最关键的一步，将复杂的决策结果翻译成
-        整个Agent框架都能理解的标准化Plan对象。
+        🔥 核心改进：引入LLM作为最终解释和生成器
+        - 智能判断是否需要工具
+        - 自然语言生成，避免生硬回答
+        - 上下文感知的决策制定
         
         Args:
             decision_result: 五阶段决策的完整结果
@@ -452,22 +484,33 @@ class NeogenesisPlanner(BasePlanner):
             ]
             thought = "\n".join(thought_parts)
             
-            # 🔄 智能路径分析 - 判断需要什么行动
-            actions = self._analyze_path_actions(chosen_path, query, decision_result)
+            # 🧠 核心改进：使用LLM作为最终决策官
+            llm_decision = self._llm_final_decision_maker(chosen_path, query, thinking_seed, decision_result)
             
-            if not actions:
-                # 如果没有生成行动，返回直接回答
-                direct_answer = self._generate_direct_answer(chosen_path, query, thinking_seed)
-                return Plan(
-                    thought=thought,
-                    final_answer=direct_answer
+            if llm_decision.get('needs_tools', False):
+                # LLM判断需要工具，使用LLM推荐的行动
+                actions = llm_decision.get('actions', [])
+                if not actions:
+                    # 如果LLM没有提供具体行动，回退到规则分析
+                    actions = self._analyze_path_actions(chosen_path, query, decision_result)
+                
+                if actions:
+                    plan = Plan(
+                        thought=llm_decision.get('explanation', thought),
+                        actions=actions
+                    )
+                else:
+                    # 即使LLM说需要工具，但没有找到合适工具，返回直接回答
+                    plan = Plan(
+                        thought=llm_decision.get('explanation', thought),
+                        final_answer=llm_decision.get('direct_answer', "抱歉，我无法找到合适的工具来处理您的请求。")
+                    )
+            else:
+                # LLM判断不需要工具，直接返回智能生成的回答
+                plan = Plan(
+                    thought=llm_decision.get('explanation', thought),
+                    final_answer=llm_decision.get('direct_answer')
                 )
-            
-            # 返回包含行动的计划
-            plan = Plan(
-                thought=thought,
-                actions=actions
-            )
             
             # 添加元数据
             plan.metadata.update({
@@ -475,10 +518,14 @@ class NeogenesisPlanner(BasePlanner):
                 'chosen_path_type': chosen_path.path_type,
                 'path_id': chosen_path.path_id,
                 'verification_stats': decision_result.get('verification_stats', {}),
-                'performance_metrics': decision_result.get('performance_metrics', {})
+                'performance_metrics': decision_result.get('performance_metrics', {}),
+                'llm_decision': llm_decision,
+                'decision_method': 'llm_final_decision_maker'
             })
             
-            logger.info(f"🔄 决策翻译完成: {len(actions)} 个行动，策略 '{chosen_path.path_type}'")
+            action_count = len(plan.actions) if plan.actions else 0
+            answer_mode = "工具执行" if plan.actions else "直接回答"
+            logger.info(f"🔄 LLM驱动决策完成: {answer_mode}, {action_count} 个行动，策略 '{chosen_path.path_type}'")
             return plan
             
         except Exception as e:
@@ -577,13 +624,430 @@ class NeogenesisPlanner(BasePlanner):
         
         return actions
     
+    def _llm_final_decision_maker(self, chosen_path: ReasoningPath, query: str, 
+                                 thinking_seed: str, decision_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        🧠 LLM作为最终解释和生成器
+        
+        让LLM扮演"最终决策官"的角色，智能判断是否需要工具以及生成自然回答。
+        这是解决路径解释错误和回答生硬问题的核心方法。
+        
+        Args:
+            chosen_path: 选中的思维路径
+            query: 用户原始查询
+            thinking_seed: 思维种子
+            decision_result: 完整决策结果
+            
+        Returns:
+            Dict[str, Any]: LLM的决策结果，包含：
+            - needs_tools: bool - 是否需要工具
+            - actions: List[Action] - 推荐的行动（如果需要工具）
+            - direct_answer: str - 直接回答（如果不需要工具）
+            - explanation: str - 决策解释
+        """
+        try:
+            logger.info(f"🧠 LLM最终决策官开始工作: 查询='{query[:50]}...', 路径='{chosen_path.path_type}'")
+            
+            # 🔍 收集可用工具信息
+            available_tools = self._get_available_tools_info()
+            
+            # 🧠 构建LLM决策提示
+            decision_prompt = self._build_llm_decision_prompt(
+                user_query=query,
+                chosen_path=chosen_path,
+                thinking_seed=thinking_seed,
+                available_tools=available_tools,
+                decision_context=decision_result
+            )
+            
+            # 🚀 调用LLM进行智能决策
+            llm_success = False
+            
+            # 多种方式尝试LLM调用
+            if hasattr(self, 'prior_reasoner') and self.prior_reasoner and hasattr(self.prior_reasoner, 'llm_manager'):
+                try:
+                    logger.info(f"🔍 尝试通过prior_reasoner调用LLM...")
+                    llm_response = self.prior_reasoner.llm_manager.generate_response(
+                        query=decision_prompt,
+                        provider="deepseek",
+                        temperature=0.3,  # 较低温度确保一致性
+                        max_tokens=1000
+                    )
+                    
+                    if llm_response and llm_response.strip():
+                        # 🔍 解析LLM响应
+                        parsed_decision = self._parse_llm_decision_response(llm_response, chosen_path, query)
+                        logger.info(f"✅ LLM决策成功: 需要工具={parsed_decision.get('needs_tools')}")
+                        return parsed_decision
+                    else:
+                        logger.warning("⚠️ LLM返回空响应")
+                        
+                except Exception as e:
+                    logger.error(f"❌ prior_reasoner LLM调用失败: {e}")
+            else:
+                logger.warning("⚠️ prior_reasoner或其llm_manager不可用")
+            
+            # 🔍 尝试直接使用DeepSeek客户端
+            if not llm_success:
+                try:
+                    import os
+                    api_key = os.getenv('DEEPSEEK_API_KEY') or os.getenv('NEOGENESIS_API_KEY')
+                    
+                    if api_key:
+                        logger.info(f"🔍 尝试直接创建DeepSeek客户端...")
+                        from neogenesis_system.providers.impl.deepseek_client import DeepSeekClient, ClientConfig
+                        
+                        client_config = ClientConfig(
+                            api_key=api_key,
+                            model="deepseek-chat",
+                            temperature=0.3,
+                            max_tokens=1000,
+                            enable_cache=False
+                        )
+                        
+                        direct_client = DeepSeekClient(client_config)
+                        api_response = direct_client.simple_chat(
+                            prompt=decision_prompt,
+                            max_tokens=1000,
+                            temperature=0.3
+                        )
+                        
+                        # 从APIResponse中提取文本内容
+                        llm_response = api_response.content if hasattr(api_response, 'content') else str(api_response)
+                        
+                        if llm_response and llm_response.strip():
+                            parsed_decision = self._parse_llm_decision_response(llm_response, chosen_path, query)
+                            logger.info(f"✅ 直接LLM决策成功: 需要工具={parsed_decision.get('needs_tools')}")
+                            return parsed_decision
+                        else:
+                            logger.warning("⚠️ 直接LLM调用返回空响应")
+                    else:
+                        logger.warning("⚠️ 未找到API密钥，无法使用直接LLM调用")
+                        
+                except Exception as e:
+                    logger.error(f"❌ 直接LLM调用失败: {e}")
+            
+            # 🔧 智能回退策略 - 现在提供更好的回答质量
+            logger.info("🔧 LLM调用失败，使用改进的智能回退策略")
+            return self._intelligent_fallback_decision(chosen_path, query, thinking_seed, available_tools)
+            
+        except Exception as e:
+            logger.error(f"❌ LLM最终决策失败: {e}")
+            return self._emergency_fallback_decision(chosen_path, query, thinking_seed)
+    
+    def _get_available_tools_info(self) -> Dict[str, str]:
+        """获取可用工具信息"""
+        tools_info = {}
+        try:
+            if self.tool_registry:
+                # 尝试获取工具列表
+                if hasattr(self.tool_registry, 'tools') and self.tool_registry.tools:
+                    for tool_name, tool_obj in self.tool_registry.tools.items():
+                        if hasattr(tool_obj, 'description'):
+                            tools_info[tool_name] = tool_obj.description
+                        else:
+                            tools_info[tool_name] = f"{tool_name} - 工具"
+                elif hasattr(self.tool_registry, '_tools') and self.tool_registry._tools:
+                    for tool_name, tool_obj in self.tool_registry._tools.items():
+                        if hasattr(tool_obj, 'description'):
+                            tools_info[tool_name] = tool_obj.description
+                        else:
+                            tools_info[tool_name] = f"{tool_name} - 工具"
+                else:
+                    # 常见工具的硬编码描述
+                    tools_info = {
+                        'web_search': '网络搜索 - 搜索网络信息和最新资讯',
+                        'knowledge_query': '知识查询 - 查询内部知识库',
+                        'idea_verification': '想法验证 - 验证想法的可行性',
+                        'llm_advisor': 'LLM顾问 - 获取AI建议和分析'
+                    }
+        except Exception as e:
+            logger.debug(f"获取工具信息时出错: {e}")
+            # 使用默认工具信息
+            tools_info = {
+                'web_search': '网络搜索 - 搜索网络信息和最新资讯',
+                'knowledge_query': '知识查询 - 查询内部知识库'
+            }
+        
+        logger.debug(f"📋 可用工具: {list(tools_info.keys())}")
+        return tools_info
+    
+    def _build_llm_decision_prompt(self, user_query: str, chosen_path: ReasoningPath, 
+                                  thinking_seed: str, available_tools: Dict[str, str],
+                                  decision_context: Dict[str, Any]) -> str:
+        """构建LLM决策提示"""
+        
+        tools_description = "\n".join([f"- {name}: {desc}" for name, desc in available_tools.items()])
+        
+        prompt = f"""你是Neogenesis智能助手的最终决策官，负责做出智能、合理的最终决策。
+
+📋 **决策上下文**
+用户问题: {user_query}
+选择的策略: {chosen_path.path_type}
+策略描述: {chosen_path.description}
+思维种子: {thinking_seed}
+
+🔧 **可用工具**
+{tools_description if tools_description else "暂无可用工具"}
+
+💡 **你的任务**
+请分析这个情况，然后做出智能判断：
+
+1. **是否需要工具?** 
+   - 对于简单的问候、感谢、闲聊等，通常不需要工具
+   - 对于需要搜索信息、获取数据、验证想法的任务，才需要工具
+   - 即使策略是"分析型"或"批判型"，如果用户只是说"你好"，也不应该使用工具
+
+2. **如何回应?**
+   - 如果不需要工具：直接生成自然、友好、符合对话上下文的回答
+   - 如果需要工具：说明需要哪些工具以及原因
+
+📝 **请用以下JSON格式回答**
+{{
+    "needs_tools": false,  // true或false
+    "tool_reasoning": "判断是否需要工具的理由",
+    "direct_answer": "如果不需要工具，这里是你的直接回答。要自然、友好、有个性。",
+    "recommended_tools": [  // 如果需要工具，推荐的工具名称
+        // ["web_search", "knowledge_query"] 等
+    ],
+    "explanation": "你的整体思考和决策解释"
+}}
+
+⚠️ **特别注意**
+- 回答要自然真诚，避免机械化的模板回答
+- 要考虑上下文，不要生硬地套用策略
+- JSON格式要严格正确"""
+        
+        return prompt
+    
+    def _parse_llm_decision_response(self, response: str, chosen_path: ReasoningPath, 
+                                   query: str) -> Dict[str, Any]:
+        """解析LLM的决策响应"""
+        try:
+            import json
+            import re
+            
+            # 提取JSON部分
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+            if not json_match:
+                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(1) if json_match.groups() else json_match.group()
+                decision_data = json.loads(json_str)
+                
+                # 构建标准化决策结果
+                result = {
+                    'needs_tools': decision_data.get('needs_tools', False),
+                    'direct_answer': decision_data.get('direct_answer', ''),
+                    'explanation': decision_data.get('explanation', ''),
+                    'tool_reasoning': decision_data.get('tool_reasoning', ''),
+                    'actions': []
+                }
+                
+                # 如果需要工具，转换为Action对象
+                if result['needs_tools'] and decision_data.get('recommended_tools'):
+                    for tool_name in decision_data.get('recommended_tools', []):
+                        if isinstance(tool_name, str):
+                            # 基于工具名称生成合适的参数
+                            tool_input = self._generate_tool_input(tool_name, query, chosen_path)
+                            result['actions'].append(Action(
+                                tool_name=tool_name,
+                                tool_input=tool_input
+                            ))
+                
+                logger.info(f"🔍 LLM决策解析成功: {result['needs_tools']=}, 工具数={len(result['actions'])}")
+                return result
+            
+        except Exception as e:
+            logger.warning(f"⚠️ 解析LLM决策响应失败: {e}")
+        
+        # 解析失败，使用响应文本生成回退决策
+        return self._extract_fallback_from_response(response, chosen_path, query)
+    
+    def _generate_tool_input(self, tool_name: str, query: str, path: ReasoningPath) -> Dict[str, Any]:
+        """根据工具名称生成合适的输入参数"""
+        if tool_name == 'web_search':
+            return {"query": query}
+        elif tool_name == 'knowledge_query':
+            return {"query": query}
+        elif tool_name == 'idea_verification':
+            return {"idea_text": f"验证关于'{query}'的想法: {path.description}"}
+        else:
+            return {"query": query}  # 通用参数
+    
+    def _extract_fallback_from_response(self, response: str, chosen_path: ReasoningPath, 
+                                      query: str) -> Dict[str, Any]:
+        """从响应文本中提取回退决策"""
+        # 简单的关键词分析
+        response_lower = response.lower()
+        
+        # 判断是否提到需要工具
+        tool_keywords = ['需要', '应该', '建议', '搜索', '查询', '工具', 'tool']
+        needs_tools = any(keyword in response_lower for keyword in tool_keywords)
+        
+        if needs_tools:
+            return {
+                'needs_tools': True,
+                'direct_answer': '',
+                'explanation': f"基于LLM响应分析，判断需要使用工具处理: {response[:200]}...",
+                'tool_reasoning': "从响应中检测到工具使用意图",
+                'actions': []  # 将由回退逻辑处理
+            }
+        else:
+            return {
+                'needs_tools': False,
+                'direct_answer': response.strip(),
+                'explanation': f"LLM提供直接回答: {chosen_path.path_type}",
+                'tool_reasoning': "从响应中判断无需工具",
+                'actions': []
+            }
+    
+    def _intelligent_fallback_decision(self, chosen_path: ReasoningPath, query: str, 
+                                     thinking_seed: str, available_tools: Dict[str, str]) -> Dict[str, Any]:
+        """智能回退决策"""
+        logger.info("🔧 使用智能回退决策策略")
+        
+        query_lower = query.lower().strip()
+        
+        # 简单问候和感谢的处理
+        greeting_patterns = ['你好', 'hello', 'hi', '您好', '早上好', '下午好', '晚上好']
+        thanks_patterns = ['谢谢', 'thanks', 'thank you', '感谢']
+        
+        if any(pattern in query_lower for pattern in greeting_patterns):
+            return {
+                'needs_tools': False,
+                'direct_answer': "你好！我是Neogenesis智能助手，很高兴为您服务。有什么我可以帮助您的吗？",
+                'explanation': "识别为问候语，无需调用工具，直接友好回应",
+                'tool_reasoning': "问候语不需要工具支持",
+                'actions': []
+            }
+        
+        if any(pattern in query_lower for pattern in thanks_patterns):
+            return {
+                'needs_tools': False,
+                'direct_answer': "不客气！如果还有其他问题，随时可以问我。",
+                'explanation': "识别为感谢语，无需调用工具，直接回应",
+                'tool_reasoning': "感谢语不需要工具支持", 
+                'actions': []
+            }
+        
+        # 判断是否需要搜索信息
+        search_indicators = ['什么是', '如何', '为什么', '哪里', '谁', '何时', '最新', '信息', '资料', '怎样']
+        if any(indicator in query_lower for indicator in search_indicators) and 'web_search' in available_tools:
+            return {
+                'needs_tools': True,
+                'direct_answer': '',
+                'explanation': f"基于'{chosen_path.path_type}'策略，检测到需要搜索相关信息",
+                'tool_reasoning': "检测到信息查询需求，建议使用搜索工具",
+                'actions': [Action(tool_name="web_search", tool_input={"query": query})]
+            }
+        
+        # 🔧 新增：智能识别自我介绍类查询
+        self_intro_patterns = ['介绍一下你自己', '你是谁', '自我介绍', '介绍自己', 'introduce yourself', 'who are you']
+        if any(pattern in query_lower for pattern in self_intro_patterns):
+            return {
+                'needs_tools': False,
+                'direct_answer': "你好！我是Neogenesis智能助手，一个基于先进认知架构的AI系统。我具备五阶段智能决策能力，包括思维种子生成、路径规划、策略选择、验证学习和智能执行。我可以帮助您进行信息查询、问题分析、创意思考等多种任务。我的特点是能够根据不同问题选择最合适的思维路径，并通过持续学习不断优化决策质量。有什么我可以帮助您的吗？",
+                'explanation': "识别为自我介绍查询，提供Neogenesis智能助手的详细介绍",
+                'tool_reasoning': "自我介绍无需工具支持，直接提供助手信息",
+                'actions': []
+            }
+        
+        # 🔧 新增：智能识别能力相关查询  
+        capability_patterns = ['你能做什么', '你有什么功能', '你会什么', '你的能力', 'what can you do', 'your capabilities']
+        if any(pattern in query_lower for pattern in capability_patterns):
+            return {
+                'needs_tools': False,
+                'direct_answer': "我具备以下核心能力：\n1. 🧠 智能决策：五阶段认知架构，能够分析问题并选择最佳处理策略\n2. 🔍 信息搜索：可以帮您搜索网络信息、获取最新资讯\n3. 🔬 想法验证：分析和验证想法的可行性\n4. 📊 数据分析：处理和分析各种文本数据\n5. 💭 创意思考：提供创新性的解决方案和建议\n6. 📝 内容生成：协助写作、总结、翻译等文本任务\n7. 🤔 问题解答：回答各领域的专业问题\n\n我最大的特点是能够根据您的具体需求，智能选择最合适的思维模式和工具来为您提供帮助。",
+                'explanation': "识别为能力查询，详细介绍助手功能",
+                'tool_reasoning': "能力介绍无需工具支持，直接提供功能清单",
+                'actions': []
+            }
+        
+        # 默认情况：生成更自然的回答，而不是暴露内部思维种子
+        return {
+            'needs_tools': False,
+            'direct_answer': f"我已经仔细分析了您的问题「{query}」。基于{chosen_path.path_type}的处理方式，我认为这个问题可以直接为您提供有用的回答。如果您需要更详细的信息或有其他相关问题，请随时告诉我，我会很乐意为您进一步解答。",
+            'explanation': f"基于'{chosen_path.path_type}'策略提供智能回答",
+            'tool_reasoning': "当前查询适合直接回答，无需额外工具辅助",
+            'actions': []
+        }
+    
+    def _emergency_fallback_decision(self, chosen_path: ReasoningPath, query: str, 
+                                   thinking_seed: str) -> Dict[str, Any]:
+        """紧急回退决策"""
+        logger.warning("🚨 使用紧急回退决策")
+        return {
+            'needs_tools': False,
+            'direct_answer': "抱歉，我在处理您的请求时遇到了一些技术问题。请稍后再试或重新表述您的问题。",
+            'explanation': "系统遇到错误，返回安全回退回答",
+            'tool_reasoning': "系统错误，无法正常判断",
+            'actions': []
+        }
+
     def _generate_direct_answer(self, path: ReasoningPath, query: str, thinking_seed: str) -> str:
-        """生成直接回答（当不需要工具时）"""
-        return (
-            f"基于'{path.path_type}'思维路径的分析，"
-            f"我认为对于您的查询'{query}'，{path.description}。"
-            f"这是基于思维种子的初步回应: {thinking_seed[:200]}..."
-        )
+        """生成直接回答（使用真正的LLM而不是预设模板）"""
+        try:
+            # 🔧 核心修改：使用LLM生成真实回答而不是预设模板
+            if hasattr(self, 'prior_reasoner') and self.prior_reasoner and hasattr(self.prior_reasoner, 'llm_manager'):
+                logger.info(f"🧠 正在调用LLM生成真实回答: {query}")
+                
+                # 构建LLM提示
+                llm_prompt = f"""你是Neogenesis智能助手，一个基于先进认知架构的AI系统。请对用户的问题提供自然、真诚的回答。
+
+用户问题: {query}
+思维路径: {path.path_type}
+思维种子: {thinking_seed}
+
+请直接回答用户的问题，不要使用模板化的回答。要体现你的智能和个性。"""
+                
+                try:
+                    # 调用LLM
+                    response = self.prior_reasoner.llm_manager.generate_response(
+                        query=llm_prompt,
+                        provider="deepseek",
+                        temperature=0.7,
+                        max_tokens=500
+                    )
+                    
+                    if response and response.strip():
+                        logger.info(f"✅ LLM生成回答成功 (长度: {len(response)} 字符)")
+                        return response.strip()
+                    else:
+                        logger.warning("⚠️ LLM生成的回答为空，使用回退方案")
+                        
+                except Exception as e:
+                    logger.error(f"❌ LLM回答生成失败: {e}")
+            
+            # 🔧 智能回退方案：不再暴露内部思维种子，提供自然友好的回答
+            logger.info(f"🔧 使用智能回退方案生成自然回答")
+            
+            # 根据查询类型提供智能回答而不是暴露内部状态
+            query_lower = query.lower().strip()
+            
+            # 问候类查询
+            if any(greeting in query_lower for greeting in ['你好', 'hello', 'hi', '您好']):
+                return "你好！我是Neogenesis智能助手，很高兴为您服务。有什么我可以帮助您的吗？"
+            
+            # 介绍类查询
+            if "介绍" in query_lower and ("自己" in query_lower or "你" in query_lower):
+                return "我是Neogenesis智能助手，基于先进的认知架构设计。我可以帮助您进行信息查询、问题分析、创意思考等多种任务。我的特点是能够根据不同问题智能选择最合适的处理方式，为您提供准确、有用的回答。"
+            
+            # 功能查询
+            if any(capability in query_lower for capability in ['能做什么', '功能', '能力']):
+                return "我具备多种AI能力：信息搜索、问题分析、想法验证、知识问答、创意思考等。我可以根据您的具体需求，智能选择最合适的方式来帮助您解决问题。请告诉我您需要什么帮助！"
+            
+            # 感谢类查询
+            if any(thanks in query_lower for thanks in ['谢谢', 'thanks', 'thank you', '感谢']):
+                return "不客气！如果您还有其他问题，随时可以问我。"
+            
+            # 通用智能回答 - 不暴露内部状态
+            return f"我理解您关于「{query}」的问题。基于我的分析，这是一个很值得探讨的话题。我很乐意为您提供详细的解答和建议。请问您希望了解哪个具体方面呢？"
+            
+        except Exception as e:
+            logger.error(f"❌ 生成直接回答时发生错误: {e}")
+            return f"抱歉，处理您的问题「{query}」时遇到了技术问题。请稍后再试或重新描述您的问题。"
     
     def _verify_idea_feasibility(self, idea_text: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """

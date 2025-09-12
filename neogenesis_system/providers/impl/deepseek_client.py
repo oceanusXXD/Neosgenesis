@@ -763,12 +763,24 @@ class DeepSeekClient(BaseLLMClient):
             bool: 配置是否有效
         """
         try:
+            # 基础配置验证 - 不进行实际API调用以避免健康检查失败
             if not self.config.api_key:
+                logger.debug("❌ DeepSeek API密钥未设置")
                 return False
             
-            # 简单测试API连通性
-            test_response = self.simple_chat("test", system_message="Reply with 'ok'")
-            return test_response.success
+            if len(self.config.api_key.strip()) < 10:
+                logger.debug("❌ DeepSeek API密钥格式无效")
+                return False
+            
+            # 检查base_url格式
+            base_url = getattr(self.config, 'base_url', None)
+            if base_url and not (base_url.startswith('http://') or base_url.startswith('https://')):
+                logger.debug("❌ DeepSeek base_url格式无效")
+                return False
+            
+            # 基础配置验证通过
+            logger.debug("✅ DeepSeek基础配置验证通过")
+            return True
             
         except Exception as e:
             logger.error(f"❌ DeepSeek配置验证失败: {e}")

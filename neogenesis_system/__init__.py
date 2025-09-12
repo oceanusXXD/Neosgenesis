@@ -151,8 +151,19 @@ def create_system(api_key: str = None, config: dict = None):
     from .cognitive_engine.mab_converger import MABConverger
     
     # 创建组件
-    prior_reasoner = PriorReasoner()
-    path_generator = PathGenerator()
+    prior_reasoner = PriorReasoner(api_key or "")
+    
+    # 创建LLM客户端（如果有API密钥）
+    llm_client = None
+    if api_key:
+        try:
+            from .providers.impl.deepseek_client import create_llm_client
+            llm_client = create_llm_client(api_key)
+        except Exception as e:
+            # 静默失败，不在create_system函数中打印错误
+            pass
+    
+    path_generator = PathGenerator(api_key or "", llm_client=llm_client)
     mab_converger = MABConverger()
     
     return NeogenesisPlanner(

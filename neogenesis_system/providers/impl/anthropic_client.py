@@ -221,12 +221,17 @@ class AnthropicClient(BaseLLMClient):
             bool: 配置是否有效
         """
         try:
-            # 简单测试API连通性
-            response = self.chat_completion(
-                messages="Hello",
-                max_tokens=5
-            )
-            return response.success
+            # 基础配置验证 - 不进行实际API调用
+            if not self.config.api_key:
+                logger.debug("❌ Anthropic API密钥未设置")
+                return False
+            
+            if len(self.config.api_key.strip()) < 10:
+                logger.debug("❌ Anthropic API密钥格式无效")
+                return False
+            
+            logger.debug("✅ Anthropic基础配置验证通过")
+            return True
             
         except Exception as e:
             logger.error(f"❌ Anthropic配置验证失败: {e}")

@@ -85,8 +85,21 @@ class NeogenesisSystem:
         self.config = config or {}
         
         # 初始化NeogenesisPlanner及其组件
-        prior_reasoner = PriorReasoner()
-        path_generator = PathGenerator()
+        prior_reasoner = PriorReasoner(api_key)
+        
+        # 创建LLM客户端（如果有API密钥）
+        llm_client = None
+        if api_key:
+            try:
+                from .providers.impl.deepseek_client import create_llm_client
+                llm_client = create_llm_client(api_key)
+                print("✅ LLM客户端创建成功，PathGenerator将启用智能分析")
+            except Exception as e:
+                print(f"⚠️ LLM客户端创建失败，使用离线模式: {e}")
+        else:
+            print("⚠️ 未提供API密钥，PathGenerator将使用离线分析模式")
+        
+        path_generator = PathGenerator(api_key, llm_client=llm_client)
         mab_converger = MABConverger()
         
         self.planner = NeogenesisPlanner(

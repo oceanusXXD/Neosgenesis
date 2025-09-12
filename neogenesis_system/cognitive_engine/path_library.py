@@ -778,7 +778,7 @@ class DynamicPathLibrary:
                 path.prompt_template,
                 path.strategy_id,
                 path.instance_id,
-                json.dumps(asdict(path.metadata), ensure_ascii=False),
+                json.dumps(self._serialize_metadata(path.metadata), ensure_ascii=False),
                 path.is_learned,
                 path.learning_source,
                 path.effectiveness_score,
@@ -801,7 +801,7 @@ class DynamicPathLibrary:
                 "prompt_template": path.prompt_template,
                 "strategy_id": path.strategy_id,
                 "instance_id": path.instance_id,
-                "metadata": asdict(path.metadata),
+                "metadata": self._serialize_metadata(path.metadata),
                 "is_learned": path.is_learned,
                 "learning_source": path.learning_source,
                 "effectiveness_score": path.effectiveness_score
@@ -817,6 +817,16 @@ class DynamicPathLibrary:
         
         except Exception as e:
             logger.error(f"❌ JSON持久化失败: {e}")
+    
+    def _serialize_metadata(self, metadata: PathMetadata) -> Dict[str, Any]:
+        """序列化路径元数据，处理枚举类型"""
+        metadata_dict = asdict(metadata)
+        # 将枚举转换为字符串
+        if 'category' in metadata_dict and hasattr(metadata_dict['category'], 'value'):
+            metadata_dict['category'] = metadata_dict['category'].value
+        if 'status' in metadata_dict and hasattr(metadata_dict['status'], 'value'):
+            metadata_dict['status'] = metadata_dict['status'].value
+        return metadata_dict
     
     def _update_stats(self):
         """更新统计信息"""

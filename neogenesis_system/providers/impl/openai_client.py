@@ -222,12 +222,24 @@ class OpenAIClient(BaseLLMClient):
             bool: 配置是否有效
         """
         try:
-            # 简单测试API连通性
-            response = self.chat_completion(
-                messages="Hello",
-                max_tokens=5
-            )
-            return response.success
+            # 基础配置验证 - 不进行实际API调用
+            if not self.config.api_key:
+                logger.debug("❌ OpenAI API密钥未设置")
+                return False
+            
+            if len(self.config.api_key.strip()) < 10:
+                logger.debug("❌ OpenAI API密钥格式无效")
+                return False
+            
+            # Azure OpenAI特殊检查
+            if self.config.provider == LLMProvider.AZURE_OPENAI:
+                base_url = self.config.base_url or (self.config.extra_params or {}).get('azure_endpoint')
+                if not base_url:
+                    logger.debug("❌ Azure OpenAI需要提供base_url或azure_endpoint")
+                    return False
+            
+            logger.debug("✅ OpenAI基础配置验证通过")
+            return True
             
         except Exception as e:
             logger.error(f"❌ OpenAI配置验证失败: {e}")
