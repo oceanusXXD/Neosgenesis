@@ -492,26 +492,27 @@ class LLMManager:
         self.last_health_check = current_time
         return results
 
-         d e f   g e n e r a t e _ r e s p o n s e ( s e l f ,   q u e r y :   s t r ,   p r o v i d e r :   s t r   =   ' d e e p s e e k ' ,   * * k w a r g s )   - >   s t r : 
-                 \ 
- 
- \ \ ub�T�^
- 
- - 
- 
- N�eHrA P I |Q�[�v�e�l\ \ \ 
-                 t r y : 
-                         f r o m   . l l m _ b a s e   i m p o r t   L L M M e s s a g e 
-                         m e s s a g e s   =   [ L L M M e s s a g e ( r o l e = ' u s e r ' ,   c o n t e n t = q u e r y ) ] 
-                         r e s p o n s e   =   s e l f . c h a t _ c o m p l e t i o n ( 
-                                 m e s s a g e s = m e s s a g e s , 
-                                 p r o v i d e r = p r o v i d e r , 
-                                 * * k w a r g s 
-                         ) 
-                         r e t u r n   r e s p o n s e . c o n t e n t 
-                 e x c e p t   E x c e p t i o n   a s   e : 
-                         l o g g e r . e r r o r ( f '   ub�T�^1Y%�:   { e } ' ) 
-                         r e t u r n   f ' �bIk�ub�T�^�e�Q�s��:   { s t r ( e ) } ' 
- 
- 
- 
+    def generate_response(self, query: str, provider: str = 'deepseek', **kwargs) -> str:
+        """
+        生成响应 - 简化的API调用接口
+        
+        Args:
+            query: 用户查询
+            provider: 指定提供商
+            **kwargs: 其他参数
+            
+        Returns:
+            str: 生成的响应内容
+        """
+        try:
+            from .llm_base import LLMMessage
+            messages = [LLMMessage(role='user', content=query)]
+            response = self.chat_completion(
+                messages=messages,
+                provider_name=provider,
+                **kwargs
+            )
+            return response.content
+        except Exception as e:
+            logger.error(f"生成响应失败: {e}")
+            return f"抱歉，生成响应时遇到错误: {str(e)}"
