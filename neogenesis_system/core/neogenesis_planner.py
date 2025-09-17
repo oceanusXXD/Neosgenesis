@@ -28,6 +28,13 @@ except ImportError:
 from ..cognitive_engine.reasoner import PriorReasoner
 from ..cognitive_engine.path_generator import PathGenerator
 from ..cognitive_engine.mab_converger import MABConverger
+
+# 导入语义分析器
+try:
+    from ..cognitive_engine.semantic_analyzer import create_semantic_analyzer
+    SEMANTIC_ANALYZER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_ANALYZER_AVAILABLE = False
 from ..cognitive_engine.data_structures import DecisionResult, ReasoningPath
 from ..shared.state_manager import StateManager
 
@@ -90,6 +97,18 @@ class NeogenesisPlanner(BasePlanner):
         
         # 🧠 认知调度器集成
         self.cognitive_scheduler = cognitive_scheduler
+        
+        # 🚀 初始化语义分析器
+        self.semantic_analyzer = None
+        if SEMANTIC_ANALYZER_AVAILABLE:
+            try:
+                self.semantic_analyzer = create_semantic_analyzer()
+                logger.info("🔍 NeogenesisPlanner 已集成语义分析器")
+            except Exception as e:
+                logger.warning(f"⚠️ 语义分析器初始化失败，将使用降级方法: {e}")
+                self.semantic_analyzer = None
+        else:
+            logger.info("📝 未发现语义分析器，使用传统关键词方法")
         
         # 🔧 如果认知调度器存在，尝试注入回溯引擎依赖
         if self.cognitive_scheduler:
@@ -538,55 +557,88 @@ class NeogenesisPlanner(BasePlanner):
     def _analyze_path_actions(self, chosen_path: ReasoningPath, query: str, 
                             decision_result: Dict[str, Any]) -> List[Action]:
         """
-        智能路径分析 - 根据选中的思维路径生成具体行动
+        智能路径分析 - 根据选中的思维路径生成具体行动 🚀 语义分析版
         
         这个方法分析chosen_path的特征，判断应该使用什么工具。
         """
         actions = []
-        path_type = chosen_path.path_type.lower()
-        path_description = chosen_path.description.lower()
+        path_description = chosen_path.description
         
-        # 🔍 搜索类路径识别
-        search_keywords = ['搜索', 'search', '查找', '信息收集', '调研', '探索', '资料']
-        if any(keyword in path_type or keyword in path_description for keyword in search_keywords):
-            # 生成搜索行动
-            search_query = self._extract_search_query(query, chosen_path)
-            actions.append(Action(
-                tool_name="web_search",
-                tool_input={"query": search_query}
-            ))
-            logger.debug(f"🔍 识别为搜索路径: {search_query}")
+        if self.semantic_analyzer and path_description:
+            # 🚀 使用语义分析器进行智能路径分析
+            try:
+                # 分析路径描述和查询内容
+                combined_text = f"{path_description} {query}"
+                analysis_result = self.semantic_analyzer.analyze(
+                    combined_text, 
+                    ['intent_detection', 'domain_classification']
+                )
+                
+                # 基于意图分析生成行动
+                if 'intent_detection' in analysis_result.analysis_results:
+                    intent_result = analysis_result.analysis_results['intent_detection'].result
+                    primary_intent = intent_result.get('primary_intent', '').lower()
+                    
+                    # 🔍 智能工具选择
+                    if any(word in primary_intent for word in ['information', 'search', 'research', 'explore', 'find']):
+                        # 信息搜索需求
+                        search_query = self._extract_search_query(query, chosen_path)
+                        actions.append(Action(
+                            tool_name="web_search",
+                            tool_input={"query": search_query}
+                        ))
+                        logger.debug(f"🔍 语义识别为搜索路径: {search_query}")
+                        
+                    elif any(word in primary_intent for word in ['verification', 'validate', 'check', 'confirm', 'verify']):
+                        # 验证需求
+                        idea_to_verify = self._extract_verification_idea(query, chosen_path)
+                        actions.append(Action(
+                            tool_name="idea_verification",
+                            tool_input={"idea_text": idea_to_verify}
+                        ))
+                        logger.debug(f"🔬 语义识别为验证路径: {idea_to_verify}")
+                        
+                    elif any(word in primary_intent for word in ['analysis', 'analyze', 'evaluate', 'compare', 'assess']):
+                        # 分析需求
+                        if not actions:  # 如果还没有其他行动
+                            search_query = f"关于 {query} 的详细信息和分析"
+                            actions.append(Action(
+                                tool_name="web_search",
+                                tool_input={"query": search_query}
+                            ))
+                            logger.debug(f"📊 语义识别为分析路径，先搜索信息: {search_query}")
+                            
+                    elif any(word in primary_intent for word in ['creative', 'design', 'brainstorm', 'imagine']):
+                        # 创意需求
+                        logger.debug(f"🤔 语义识别为创意路径，无需工具支持")
+                        
+                    else:
+                        # 默认处理
+                        logger.debug(f"🤖 语义分析未匹配特定意图，使用通用判断")
+                
+                # 基于领域分析进行工具优化
+                if 'domain_classification' in analysis_result.analysis_results:
+                    domain_result = analysis_result.analysis_results['domain_classification'].result
+                    primary_domain = domain_result.get('primary_domain', 'general')
+                    
+                    # 根据领域优化工具选择
+                    if primary_domain == 'technology' and actions:
+                        # 技术领域，可能需要更具体的搜索
+                        for action in actions:
+                            if action.tool_name == "web_search":
+                                original_query = action.tool_input.get("query", "")
+                                action.tool_input["query"] = f"{original_query} 技术实现 最佳实践"
+                
+                logger.debug("🔍 路径行动语义分析成功")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ 路径行动语义分析失败: {e}")
+                # 使用默认行动
+                pass
+        else:
+            logger.debug("📝 语义分析器不可用，跳过智能路径分析")
         
-        # 🔬 验证类路径识别
-        verification_keywords = ['验证', 'verify', '确认', '检查', '核实', '审查']
-        if any(keyword in path_type or keyword in path_description for keyword in verification_keywords):
-            # 生成验证行动
-            idea_to_verify = self._extract_verification_idea(query, chosen_path)
-            actions.append(Action(
-                tool_name="idea_verification",
-                tool_input={"idea_text": idea_to_verify}
-            ))
-            logger.debug(f"🔬 识别为验证路径: {idea_to_verify}")
-        
-        # 📊 分析类路径识别
-        analysis_keywords = ['分析', 'analysis', '评估', '比较', '总结', '归纳']
-        if any(keyword in path_type or keyword in path_description for keyword in analysis_keywords):
-            # 对于分析类任务，可能需要先搜索信息再分析
-            if not actions:  # 如果还没有其他行动
-                search_query = f"关于 {query} 的详细信息和分析"
-                actions.append(Action(
-                    tool_name="web_search",
-                    tool_input={"query": search_query}
-                ))
-                logger.debug(f"📊 识别为分析路径，先搜索信息: {search_query}")
-        
-        # 🤔 创意类路径识别
-        creative_keywords = ['创意', 'creative', '创新', '头脑风暴', '想象', '设计']
-        if any(keyword in path_type or keyword in path_description for keyword in creative_keywords):
-            # 创意类任务通常不需要工具，直接由LLM处理
-            logger.debug(f"🤔 识别为创意路径，无需工具支持")
-        
-        # 🔧 如果没有识别出特定类型，根据查询内容进行通用判断
+        # 🔧 如果没有识别出任何行动，使用回退方法
         if not actions:
             actions.extend(self._generate_fallback_actions(query, chosen_path))
         
@@ -610,19 +662,9 @@ class NeogenesisPlanner(BasePlanner):
         return f"基于查询'{original_query}'的想法: {path.description}"
     
     def _generate_fallback_actions(self, query: str, path: ReasoningPath) -> List[Action]:
-        """生成回退行动（当无法识别特定路径类型时）"""
-        actions = []
-        
-        # 检查查询中是否包含明显的搜索意图
-        search_indicators = ['什么是', '如何', '为什么', '哪里', '谁', '何时', '最新', '信息', '资料']
-        if any(indicator in query for indicator in search_indicators):
-            actions.append(Action(
-                tool_name="web_search",
-                tool_input={"query": query}
-            ))
-            logger.debug(f"🔧 回退策略: 识别为搜索查询")
-        
-        return actions
+        """生成简化的默认行动"""
+        # 返回空的行动列表，让系统使用直接回答模式
+        return []
     
     def _llm_final_decision_maker(self, chosen_path: ReasoningPath, query: str, 
                                  thinking_seed: str, decision_result: Dict[str, Any]) -> Dict[str, Any]:
