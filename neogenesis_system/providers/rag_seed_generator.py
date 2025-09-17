@@ -29,6 +29,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .search_client import WebSearchClient, SearchResult, SearchResponse
 # from .utils.client_adapter import DeepSeekClientAdapter  # 不再需要，使用依赖注入
 from ..shared.common_utils import parse_json_response
+
+# 导入语义分析器
+try:
+    from ..cognitive_engine.semantic_analyzer import create_semantic_analyzer
+    SEMANTIC_ANALYZER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_ANALYZER_AVAILABLE = False
 try:
     from neogenesis_system.config import PROMPT_TEMPLATES, RAG_CONFIG
 except ImportError:
@@ -120,6 +127,18 @@ class RAGSeedGenerator:
         # 搜索策略缓存
         self.strategy_cache = {}  # 查询模式 -> 搜索策略
         self.information_cache = {}  # 关键词 -> 搜索结果
+        
+        # 🚀 初始化语义分析器
+        self.semantic_analyzer = None
+        if SEMANTIC_ANALYZER_AVAILABLE:
+            try:
+                self.semantic_analyzer = create_semantic_analyzer()
+                logger.info("🔍 RAGSeedGenerator 已集成语义分析器")
+            except Exception as e:
+                logger.warning(f"⚠️ 语义分析器初始化失败，将使用降级方法: {e}")
+                self.semantic_analyzer = None
+        else:
+            logger.info("📝 未发现语义分析器，使用传统关键词方法")
         self.synthesis_cache = {}  # 查询+信息哈希 -> 综合结果
         
         # RAG质量跟踪
@@ -277,65 +296,155 @@ class RAGSeedGenerator:
             raise ValueError("LLM搜索策略解析失败")
     
     def _heuristic_search_planning(self, user_query: str, execution_context: Optional[Dict]) -> RAGSearchStrategy:
-        """基于启发式规则的搜索策略生成"""
+        """基于启发式规则的搜索策略生成 - 🚀 智能语义分析版"""
         
-        # 基础关键词提取
+        if self.semantic_analyzer:
+            # 🚀 使用语义分析器进行智能策略生成
+            try:
+                # 执行多任务语义分析
+                analysis_result = self.semantic_analyzer.analyze(
+                    user_query, 
+                    ['intent_detection', 'complexity_assessment', 'domain_classification']
+                )
+                
+                primary_keywords = []
+                secondary_keywords = []
+                search_intent = "寻找相关事实信息"
+                information_types = ["事实", "数据", "案例"]
+                search_depth = "medium"
+                domain_focus = "通用"
+                
+                # 基于意图分析确定搜索策略
+                if 'intent_detection' in analysis_result.analysis_results:
+                    intent_result = analysis_result.analysis_results['intent_detection'].result
+                    primary_intent = intent_result.get('primary_intent', '').lower()
+                    
+                    # 智能搜索意图映射
+                    if any(word in primary_intent for word in ['question', 'information', 'explain', 'understand']):
+                        search_intent = "寻找解释或指导信息"
+                        information_types = ["教程", "定义", "指南", "解释"]
+                    elif any(word in primary_intent for word in ['compare', 'evaluation', 'best', 'choose']):
+                        search_intent = "寻找比较和推荐信息"
+                        information_types = ["比较", "评测", "推荐", "对比"]
+                    elif any(word in primary_intent for word in ['solve', 'problem', 'help', 'fix']):
+                        search_intent = "寻找解决方案信息"
+                        information_types = ["解决方案", "教程", "实践", "案例"]
+                
+                # 基于复杂度分析确定搜索深度
+                if 'complexity_assessment' in analysis_result.analysis_results:
+                    complexity_result = analysis_result.analysis_results['complexity_assessment'].result
+                    complexity_level = complexity_result.get('complexity_level', 'medium')
+                    
+                    if complexity_level in ['high', 'expert']:
+                        search_depth = "deep"
+                    elif complexity_level == 'low':
+                        search_depth = "shallow"
+                    else:
+                        search_depth = "medium"
+                
+                # 基于领域分析确定领域焦点
+                if 'domain_classification' in analysis_result.analysis_results:
+                    domain_result = analysis_result.analysis_results['domain_classification'].result
+                    primary_domain = domain_result.get('primary_domain', 'general')
+                    
+                    domain_mapping = {
+                        'technology': '技术',
+                        'business': '商业', 
+                        'academic': '学术',
+                        'health': '健康',
+                        'creative': '创意',
+                        'general': '通用'
+                    }
+                    domain_focus = domain_mapping.get(primary_domain, '通用')
+                
+                # 智能关键词提取（基于查询分析而非硬编码列表）
+                primary_keywords = self._extract_semantic_keywords(user_query, analysis_result)
+                secondary_keywords = self._generate_secondary_keywords(primary_keywords, domain_focus)
+                
+                logger.debug("🔍 RAG搜索策略语义分析成功")
+                
+                return RAGSearchStrategy(
+                    primary_keywords=primary_keywords,
+                    secondary_keywords=secondary_keywords,
+                    search_intent=search_intent,
+                    domain_focus=domain_focus,
+                    information_types=information_types,
+                    search_depth=search_depth
+                )
+                
+            except Exception as e:
+                logger.warning(f"⚠️ RAG策略语义分析失败: {e}")
+                # 使用默认搜索策略
+                return RAGSearchStrategy(
+                    primary_keywords=user_query.split()[:5],
+                    secondary_keywords=[],
+                    search_intent="寻找相关信息",
+                    domain_focus="通用",
+                    information_types=["事实", "数据"],
+                    search_depth="medium"
+                )
+        else:
+            logger.debug("📝 语义分析器不可用，使用简化搜索策略")
+            # 简化的搜索策略
+            return RAGSearchStrategy(
+                primary_keywords=user_query.split()[:5],
+                secondary_keywords=[],
+                search_intent="寻找相关信息",
+                domain_focus="通用", 
+                information_types=["事实", "数据"],
+                search_depth="medium"
+            )
+    
+    def _extract_semantic_keywords(self, user_query: str, analysis_result) -> List[str]:
+        """基于语义分析提取关键词"""
+        keywords = []
+        
+        # 基础词汇提取（保留简单有效的方法）
         import re
         words = re.findall(r'\b\w+\b', user_query.lower())
-        
-        # 技术术语识别（包含中英文）
-        tech_terms = [
-            'api', 'algorithm', 'database', 'system', 'architecture', 'optimization',
-            'machine learning', 'ml', 'ai', 'artificial intelligence', 'deep learning',
-            'network', 'crawler', 'data analysis', 'real-time', 'performance',
-            'rag', 'retrieval', 'generation', 'llm', 'transformer',
-            # 中文技术术语
-            '机器学习', '算法', '架构', '数据库', '系统', '优化', '人工智能',
-            '深度学习', '网络', '性能', '分布式', '实时', '高性能'
-        ]
-        
-        primary_keywords = []
-        secondary_keywords = []
-        
-        # 识别技术关键词
-        for term in tech_terms:
-            if term in user_query.lower():
-                primary_keywords.append(term)
-        
-        # 添加原始查询的主要词汇
         important_words = [w for w in words if len(w) > 3][:5]
-        primary_keywords.extend(important_words)
+        keywords.extend(important_words)
         
-        # 去重
-        primary_keywords = list(set(primary_keywords))[:6]
+        # 基于领域分析添加专业词汇
+        if 'domain_classification' in analysis_result.analysis_results:
+            domain_result = analysis_result.analysis_results['domain_classification'].result
+            primary_domain = domain_result.get('primary_domain', 'general')
+            
+            # 根据领域添加相关搜索词汇
+            domain_keywords = {
+                'technology': ['技术', 'solution', 'implementation', '实现'],
+                'business': ['strategy', '策略', 'business', '商业'],
+                'academic': ['research', '研究', 'study', '学术'],
+                'health': ['health', '健康', 'medical', '医疗'],
+                'creative': ['design', '设计', 'creative', '创意']
+            }
+            
+            if primary_domain in domain_keywords:
+                keywords.extend(domain_keywords[primary_domain])
         
-        # 确定领域和意图
-        if any(term in user_query.lower() for term in ['how', 'what', 'why', '如何', '什么', '为什么']):
-            search_intent = "寻找解释或指导信息"
-            information_types = ["教程", "定义", "指南"]
-        elif any(term in user_query.lower() for term in ['best', 'compare', '最好', '比较']):
-            search_intent = "寻找比较和推荐信息"
-            information_types = ["比较", "评测", "推荐"]
-        else:
-            search_intent = "寻找相关事实信息"
-            information_types = ["事实", "数据", "案例"]
+        # 去重并限制数量
+        keywords = list(set(keywords))[:8]
+        return keywords
+    
+    def _generate_secondary_keywords(self, primary_keywords: List[str], domain_focus: str) -> List[str]:
+        """生成次要关键词"""
+        secondary = []
         
-        # 判断搜索深度
-        if len(user_query) > 100 or any(term in user_query.lower() for term in ['complex', 'advanced', '复杂', '高级']):
-            search_depth = "deep"
-        elif len(user_query) < 30:
-            search_depth = "shallow"
-        else:
-            search_depth = "medium"
+        # 基于领域添加相关词汇
+        domain_secondary = {
+            '技术': ['best practices', '最佳实践', 'tutorial', '教程'],
+            '商业': ['case study', '案例', 'market', '市场'],
+            '学术': ['literature', '文献', 'methodology', '方法'],
+            '健康': ['guidelines', '指南', 'symptoms', '症状'],
+            '创意': ['inspiration', '灵感', 'examples', '示例'],
+            '通用': ['guide', '指南', 'tips', '技巧']
+        }
         
-        return RAGSearchStrategy(
-            primary_keywords=primary_keywords,
-            secondary_keywords=secondary_keywords,
-            search_intent=search_intent,
-            domain_focus="技术" if any(t in primary_keywords for t in tech_terms) else "通用",
-            information_types=information_types,
-            search_depth=search_depth
-        )
+        if domain_focus in domain_secondary:
+            secondary.extend(domain_secondary[domain_focus])
+        
+        return secondary[:4]
+    
     
     def _execute_web_search(self, strategy: RAGSearchStrategy) -> List[SearchResult]:
         """
