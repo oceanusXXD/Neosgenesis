@@ -832,3 +832,41 @@ class KnowledgeProvenance:
             "context_tags": list(self.context_tags),
             "is_expired": self.is_expired
         }
+
+
+@dataclass
+class StrategyDecision:
+    """
+    战略决策结果 - 连接战略规划器和战术规划器的桥梁
+    
+    这个数据结构包含了战略规划器的完整决策结果，
+    为战术规划器提供所需的所有上下文信息。
+    
+    Attributes:
+        chosen_path: 选中的推理路径
+        thinking_seed: 思维种子
+        reasoning: 决策推理过程
+        user_query: 用户原始查询
+        available_paths: 所有可用的推理路径
+        verified_paths: 验证过的路径信息
+        timestamp: 决策时间戳
+        round_number: 决策轮次
+        selection_algorithm: 选择算法
+        verification_stats: 验证统计信息
+        performance_metrics: 性能指标
+        execution_context: 执行上下文
+        confidence_score: 置信度分数
+    """
+    chosen_path: Any  # 使用Any避免循环导入，实际类型是ReasoningPath
+    thinking_seed: str
+    reasoning: str
+    user_query: str
+    available_paths: List[Any]  # List[ReasoningPath]
+    verified_paths: List[Dict[str, Any]]
+    timestamp: float
+    round_number: int
+    selection_algorithm: str
+    verification_stats: Dict[str, Any]
+    performance_metrics: Dict[str, Any]
+    execution_context: Optional[Dict[str, Any]] = None
+    confidence_score: float = 0.5
