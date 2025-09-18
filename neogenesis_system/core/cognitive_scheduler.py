@@ -105,19 +105,41 @@ class CognitiveScheduler:
                 "task_timeout": 180.0                # 认知任务超时时间
             },
             
-            # 🌐 知识探索配置 - 新增
+            # 🌐 知识探索配置 - 双轨探索系统
             "knowledge_exploration": {
+                # 通用配置
+                "max_exploration_depth": 3,         # 最大探索深度
+                "enable_web_search": True,          # 启用网络搜索
+                "enable_trend_analysis": True,      # 启用趋势分析
+                "knowledge_threshold": 0.7,         # 知识质量阈值
+                
+                # 自主探索配置
                 "exploration_strategies": [
                     "domain_expansion",      # 领域扩展
                     "trend_monitoring",      # 趋势监控
                     "gap_analysis",         # 知识缺口分析
                     "cross_domain_learning" # 跨域学习
                 ],
-                "max_exploration_depth": 3,         # 最大探索深度
-                "exploration_timeout": 120.0,       # 单次探索超时
-                "enable_web_search": True,          # 启用网络搜索
-                "enable_trend_analysis": True,      # 启用趋势分析
-                "knowledge_threshold": 0.7          # 知识质量阈值
+                "exploration_timeout": 120.0,       # 自主探索超时
+                
+                # 🎯 用户指令驱动探索配置
+                "user_directed_timeout": 60.0,      # 用户指令探索超时（更短）
+                "user_directed_strategies": [
+                    "expert_knowledge",      # 专家知识获取
+                    "domain_expansion",      # 领域扩展
+                    "competitive_intelligence", # 竞争情报
+                    "trend_monitoring"       # 趋势监控
+                ],
+                
+                # 🎯 双轨平衡机制
+                "dual_track_config": {
+                    "user_directed_priority": 10,   # 用户指令最高优先级
+                    "autonomous_priority": 3,       # 自主探索较低优先级
+                    "max_concurrent_user_tasks": 3, # 最大并发用户任务
+                    "max_concurrent_autonomous": 1, # 最大并发自主任务
+                    "user_task_preemption": True,   # 允许用户任务抢占
+                    "balance_threshold": 0.8         # 平衡阈值
+                }
             },
             
             # 资源管理配置
@@ -437,33 +459,255 @@ class CognitiveScheduler:
         self.cognitive_task_queue.put(task)
         logger.info("🧩 已安排知识综合任务")
     
-    def _schedule_knowledge_exploration_task(self):
-        """🌐 安排知识探索任务 - 播下探索的种子"""
+    def _schedule_knowledge_exploration_task(self, user_query: Optional[str] = None, user_context: Optional[Dict[str, Any]] = None):
+        """🌐 安排知识探索任务 - 双轨探索目标系统
+        
+        Args:
+            user_query: 用户查询，如果提供则创建用户指令驱动的高优先级探索任务
+            user_context: 用户上下文信息（可选）
+        """
         current_time = time.time()
         
-        # 分析当前知识状态，确定探索方向
-        exploration_context = self._analyze_exploration_opportunities()
+        # 🎯 双轨探索模式判断
+        if user_query:
+            # 用户指令驱动的高优先级探索模式
+            logger.info(f"🎯 启动用户指令驱动探索模式: {user_query[:50]}...")
+            
+            task = CognitiveTask(
+                task_id="",
+                task_type="knowledge_exploration",
+                priority=10,  # 最高优先级 - 用户指令驱动
+                context={
+                    "exploration_mode": "user_directed",
+                    "user_query": user_query,
+                    "user_context": user_context or {},
+                    "trigger_reason": "user_instruction",
+                    "immediate_priority": True,
+                    # 基于用户查询生成的探索上下文
+                    "exploration_opportunities": self._analyze_user_query_exploration_opportunities(user_query, user_context),
+                    "exploration_strategies": self._select_user_directed_strategies(user_query),
+                    "session_insights": self._extract_session_insights(),
+                    "current_knowledge_gaps": self._identify_knowledge_gaps(),
+                    "created_at": current_time
+                },
+                estimated_duration=self.config["knowledge_exploration"]["user_directed_timeout"]
+            )
+            
+            # 🚀 立即插入到队列前端，确保优先执行
+            self._insert_high_priority_task(task)
+            
+            logger.info("🎯 用户指令驱动探索任务已创建 - 最高优先级")
+            logger.info(f"   用户查询: {user_query[:100]}...")
+            logger.info(f"   探索策略: {task.context.get('exploration_strategies', [])[:2]}")
+            
+        else:
+            # 系统自主探索的低优先级模式（原有逻辑）
+            logger.info("🔄 启动系统自主探索模式")
+            
+            # 分析当前知识状态，确定探索方向
+            exploration_context = self._analyze_exploration_opportunities()
+            
+            task = CognitiveTask(
+                task_id="",
+                task_type="knowledge_exploration",
+                priority=3,  # 较低优先级 - 系统自主探索
+                context={
+                    "exploration_mode": "autonomous",
+                    "exploration_opportunities": exploration_context,
+                    "session_insights": self._extract_session_insights(),
+                    "current_knowledge_gaps": self._identify_knowledge_gaps(),
+                    "exploration_strategies": self.config["knowledge_exploration"]["exploration_strategies"],
+                    "trigger_reason": "proactive_exploration",
+                    "immediate_priority": False,
+                    "created_at": current_time
+                },
+                estimated_duration=self.config["knowledge_exploration"]["exploration_timeout"]
+            )
+            
+            self.cognitive_task_queue.put(task)
+            
+            logger.info("🔄 自主探索任务已安排 - 常规优先级")
+            logger.info(f"   探索机会数量: {len(exploration_context)}")
+            logger.info(f"   探索策略: {task.context['exploration_strategies'][:2]}...")
         
-        task = CognitiveTask(
-            task_id="",
-            task_type="knowledge_exploration",
-            priority=8,  # 高优先级，探索对认知飞轮很重要
-            context={
-                "exploration_opportunities": exploration_context,
-                "session_insights": self._extract_session_insights(),
-                "current_knowledge_gaps": self._identify_knowledge_gaps(),
-                "exploration_strategies": self.config["knowledge_exploration"]["exploration_strategies"],
-                "trigger_reason": "proactive_exploration"
-            },
-            estimated_duration=self.config["knowledge_exploration"]["exploration_timeout"]
-        )
-        
-        self.cognitive_task_queue.put(task)
         self.last_exploration_time = current_time
+    
+    def _analyze_user_query_exploration_opportunities(self, user_query: str, user_context: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """🎯 分析用户查询中的探索机会 - 用户指令驱动模式"""
+        opportunities = []
         
-        logger.info("🌐 已安排知识探索任务 - 主动探索模式启动")
-        logger.info(f"   探索机会数量: {len(exploration_context)}")
-        logger.info(f"   探索策略: {task.context['exploration_strategies'][:2]}...")
+        try:
+            # 基础关键词提取
+            query_keywords = self._extract_query_keywords(user_query)
+            
+            # 识别用户查询中的领域和主题
+            query_domains = self._identify_query_domains(user_query)
+            
+            # 构建针对用户查询的探索机会
+            for domain in query_domains:
+                opportunities.append({
+                    "type": "user_query_domain",
+                    "domain": domain,
+                    "query": user_query,
+                    "keywords": query_keywords,
+                    "priority": "high",
+                    "exploration_focus": f"深入了解用户关于'{domain}'的具体需求",
+                    "search_terms": self._generate_user_focused_search_terms(user_query, domain)
+                })
+            
+            # 添加相关主题探索
+            if len(opportunities) < 3:  # 确保有足够的探索方向
+                opportunities.extend([
+                    {
+                        "type": "related_topics",
+                        "query": user_query,
+                        "keywords": query_keywords,
+                        "priority": "medium",
+                        "exploration_focus": f"寻找与'{user_query[:30]}...'相关的信息和案例",
+                        "search_terms": query_keywords[:5]
+                    }
+                ])
+            
+            logger.debug(f"🎯 用户查询探索机会分析完成: {len(opportunities)} 个机会")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ 用户查询探索机会分析失败: {e}")
+            # 提供基础的探索机会
+            opportunities.append({
+                "type": "basic_user_query",
+                "query": user_query,
+                "priority": "high",
+                "exploration_focus": f"基于用户查询的基础信息收集"
+            })
+        
+        return opportunities
+    
+    def _select_user_directed_strategies(self, user_query: str) -> List[str]:
+        """🎯 为用户指令选择最适合的探索策略"""
+        query_lower = user_query.lower()
+        strategies = []
+        
+        # 基于查询内容选择策略
+        if any(keyword in query_lower for keyword in ['最新', '趋势', '发展', '动态', 'latest', 'trend']):
+            strategies.extend(['trend_monitoring', 'domain_expansion'])
+        
+        if any(keyword in query_lower for keyword in ['如何', '方法', '解决', 'how', 'solution', 'method']):
+            strategies.extend(['expert_knowledge', 'gap_analysis'])
+        
+        if any(keyword in query_lower for keyword in ['比较', '对比', 'compare', 'versus', 'vs']):
+            strategies.extend(['competitive_intelligence', 'cross_domain_learning'])
+        
+        if any(keyword in query_lower for keyword in ['创新', '新颖', 'innovative', 'creative', 'novel']):
+            strategies.extend(['serendipity_discovery', 'cross_domain_learning'])
+        
+        # 默认策略
+        if not strategies:
+            strategies = ['domain_expansion', 'expert_knowledge']
+        
+        # 限制策略数量，避免过度探索
+        return strategies[:3]
+    
+    def _insert_high_priority_task(self, task: CognitiveTask):
+        """🚀 插入高优先级任务到队列前端"""
+        try:
+            # 由于Queue不支持优先级插入，我们使用一个临时列表来重组队列
+            temp_tasks = []
+            
+            # 先取出所有现有任务
+            while not self.cognitive_task_queue.empty():
+                try:
+                    existing_task = self.cognitive_task_queue.get_nowait()
+                    temp_tasks.append(existing_task)
+                except Empty:
+                    break
+            
+            # 首先插入高优先级任务
+            self.cognitive_task_queue.put(task)
+            
+            # 然后按优先级重新插入其他任务
+            temp_tasks.sort(key=lambda t: t.priority, reverse=True)
+            for existing_task in temp_tasks:
+                self.cognitive_task_queue.put(existing_task)
+            
+            logger.debug(f"🚀 高优先级任务已插入队列前端: {task.task_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ 插入高优先级任务失败: {e}")
+            # 回退到普通插入
+            self.cognitive_task_queue.put(task)
+    
+    def _extract_query_keywords(self, user_query: str) -> List[str]:
+        """提取用户查询中的关键词"""
+        import re
+        
+        # 简单的关键词提取（可以后续用更高级的NLP方法替换）
+        words = re.findall(r'\b\w+\b', user_query.lower())
+        
+        # 过滤停用词和短词
+        stop_words = {'的', '是', '在', '有', '和', '与', '或', '但', '然而', '因此', 'the', 'is', 'in', 'and', 'or', 'but', 'how', 'what', 'where', 'when', 'why'}
+        keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+        
+        return keywords[:8]  # 返回前8个关键词
+    
+    def _identify_query_domains(self, user_query: str) -> List[str]:
+        """识别用户查询所属的领域"""
+        query_lower = user_query.lower()
+        domains = []
+        
+        domain_keywords = {
+            "技术": ['api', '算法', '编程', '代码', '系统', '架构', '数据库', '机器学习', 'ai', 'python', 'java'],
+            "商业": ['市场', '营销', '销售', '商业', '管理', '策略', '投资', '创业', '公司'],
+            "学术": ['研究', '论文', '理论', '学术', '科学', '实验', '分析', '方法'],
+            "健康": ['健康', '医疗', '疾病', '治疗', '保健', '医学', '药物'],
+            "教育": ['学习', '教育', '培训', '课程', '知识', '技能', '学校'],
+            "生活": ['生活', '日常', '家居', '旅行', '美食', '娱乐', '休闲']
+        }
+        
+        for domain, keywords in domain_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                domains.append(domain)
+        
+        # 如果没有匹配到特定领域，返回通用领域
+        if not domains:
+            domains = ["通用"]
+        
+        return domains[:2]  # 最多返回2个主要领域
+    
+    def _generate_user_focused_search_terms(self, user_query: str, domain: str) -> List[str]:
+        """为用户查询生成针对性的搜索词条"""
+        base_terms = self._extract_query_keywords(user_query)
+        
+        # 根据领域添加相关的搜索增强词
+        domain_enhancers = {
+            "技术": ["最佳实践", "教程", "案例", "解决方案"],
+            "商业": ["案例研究", "市场分析", "成功案例", "策略"],
+            "学术": ["最新研究", "文献综述", "方法论", "实证分析"],
+            "健康": ["专业建议", "临床研究", "预防方法", "治疗方案"],
+            "教育": ["学习资源", "教学方法", "实践指南", "技能培养"],
+            "生活": ["实用指南", "经验分享", "推荐", "评价"]
+        }
+        
+        enhancers = domain_enhancers.get(domain, ["详细信息", "指南", "建议"])
+        
+        # 组合生成搜索词条
+        search_terms = base_terms[:3]  # 基础关键词
+        search_terms.extend(enhancers[:2])  # 增强词
+        
+        return search_terms
+    
+    def schedule_user_directed_exploration(self, user_query: str, user_context: Optional[Dict[str, Any]] = None):
+        """🎯 公共接口：为用户指令安排高优先级探索任务"""
+        logger.info(f"🎯 接收到用户指令驱动的探索请求: {user_query[:50]}...")
+        
+        # 记录用户指令统计
+        if "user_directed_explorations" not in self.stats:
+            self.stats["user_directed_explorations"] = 0
+        self.stats["user_directed_explorations"] += 1
+        
+        # 调用内部方法创建探索任务
+        self._schedule_knowledge_exploration_task(user_query=user_query, user_context=user_context)
+        
+        logger.info("🎯 用户指令驱动探索任务已安排完成")
     
     def _cognitive_worker_loop(self):
         """认知工作线程循环"""
