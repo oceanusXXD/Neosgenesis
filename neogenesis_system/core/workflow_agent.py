@@ -1206,14 +1206,9 @@ class WorkflowGenerationAgent(BaseAgent):
                 try:
                     observations = self.execute_plan(plan)
                     
-                    # 整合观察结果
+                    # 🎨 增强的结果整合逻辑：支持图文并茂输出
                     if observations:
-                        result_parts = []
-                        for obs in observations:
-                            if obs.output:
-                                result_parts.append(str(obs.output))
-                        
-                        execution_result = "\n\n".join(result_parts) if result_parts else "执行完成，但未获得具体结果。"
+                        execution_result = self._integrate_multimedia_results(observations, query, plan)
                     else:
                         execution_result = "工具执行完成。"
                     
@@ -1309,6 +1304,224 @@ class WorkflowGenerationAgent(BaseAgent):
         # 更新基础Agent统计
         plan_size = plan.action_count if plan else 0
         self.update_stats(success, execution_time, plan_size)
+    
+    def _integrate_multimedia_results(self, observations: List[Observation], query: str, plan: Plan) -> str:
+        """🎨 整合多媒体结果，支持图文并茂输出"""
+        text_results = []
+        image_results = []
+        other_results = []
+        
+        logger.info(f"🖼️ 开始整合 {len(observations)} 个观察结果")
+        
+        # 分类处理不同类型的结果
+        for obs in observations:
+            if not obs.output:
+                continue
+                
+            # 🎨 检测是否为图像生成工具的输出
+            if self._is_image_generation_result(obs):
+                image_info = self._extract_image_information(obs)
+                if image_info:
+                    image_results.append(image_info)
+                    logger.info(f"🎨 检测到图像生成结果: {image_info.get('filename', 'unknown')}")
+            else:
+                # 其他类型的结果
+                result_text = self._format_observation_output(obs)
+                if result_text:
+                    if self._is_textual_result(obs):
+                        text_results.append(result_text)
+                    else:
+                        other_results.append(result_text)
+        
+        # 生成最终的图文整合响应
+        return self._create_multimedia_response(text_results, image_results, other_results, query, plan)
+    
+    def _is_image_generation_result(self, obs: Observation) -> bool:
+        """🖼️ 检测观察结果是否来自图像生成工具"""
+        # 检查工具名称
+        if hasattr(obs.action, 'tool_name'):
+            image_tool_names = ['stable_diffusion_xl_generator', 'image_generation', 'generate_image']
+            if obs.action.tool_name in image_tool_names:
+                return True
+        
+        # 检查输出内容是否包含图像信息
+        if isinstance(obs.output, dict):
+            image_indicators = ['saved_path', 'image_object', 'filename', 'image_size']
+            if any(indicator in obs.output for indicator in image_indicators):
+                return True
+        elif isinstance(obs.output, str):
+            # 检查字符串中是否包含图像路径
+            image_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']
+            if any(ext in obs.output.lower() for ext in image_extensions):
+                return True
+        
+        return False
+    
+    def _extract_image_information(self, obs: Observation) -> Optional[Dict[str, Any]]:
+        """🖼️ 提取图像信息"""
+        image_info = {
+            'type': 'image',
+            'tool_name': getattr(obs.action, 'tool_name', 'unknown'),
+            'success': obs.success
+        }
+        
+        if isinstance(obs.output, dict):
+            # 结构化的图像结果
+            image_info.update({
+                'filename': obs.output.get('filename', ''),
+                'saved_path': obs.output.get('saved_path', ''),
+                'prompt': obs.output.get('prompt', ''),
+                'image_size': obs.output.get('image_size', ''),
+                'model': obs.output.get('model', ''),
+                'generated_at': obs.output.get('generated_at', '')
+            })
+        elif isinstance(obs.output, str):
+            # 简单的字符串结果，尝试提取有用信息
+            image_info['raw_output'] = obs.output
+            # 尝试从字符串中提取文件路径
+            import re
+            path_match = re.search(r'([^\s]+\.(png|jpg|jpeg|gif|bmp|webp))', obs.output, re.IGNORECASE)
+            if path_match:
+                image_info['saved_path'] = path_match.group(1)
+                image_info['filename'] = path_match.group(1).split('/')[-1].split('\\')[-1]
+        
+        return image_info if image_info.get('saved_path') or image_info.get('filename') else None
+    
+    def _is_textual_result(self, obs: Observation) -> bool:
+        """检查是否为文本类结果"""
+        if hasattr(obs.action, 'tool_name'):
+            text_tool_names = ['web_search', 'knowledge_query', 'idea_verification', 'text_analysis']
+            return obs.action.tool_name in text_tool_names
+        return True  # 默认为文本结果
+    
+    def _format_observation_output(self, obs: Observation) -> str:
+        """格式化观察结果为字符串"""
+        if isinstance(obs.output, str):
+            return obs.output
+        elif isinstance(obs.output, dict):
+            # 尝试提取有意义的文本内容
+            if 'content' in obs.output:
+                return obs.output['content']
+            elif 'result' in obs.output:
+                return str(obs.output['result'])
+            elif 'message' in obs.output:
+                return obs.output['message']
+            else:
+                return str(obs.output)
+        else:
+            return str(obs.output)
+    
+    def _create_multimedia_response(self, text_results: List[str], image_results: List[Dict], 
+                                  other_results: List[str], query: str, plan: Plan) -> str:
+        """🎨 创建图文并茂的响应"""
+        response_parts = []
+        
+        # 🎨 如果有图像结果，优先展示
+        if image_results:
+            logger.info(f"🎨 正在生成图文并茂响应，包含 {len(image_results)} 张图片")
+            
+            # 生成图像部分的介绍
+            response_parts.append(self._generate_image_introduction(query, len(image_results)))
+            
+            # 添加每张图片的信息
+            for i, img_info in enumerate(image_results, 1):
+                image_section = self._format_image_section(img_info, i, len(image_results))
+                response_parts.append(image_section)
+        
+        # 📝 添加文本结果
+        if text_results:
+            if image_results:
+                response_parts.append("\n" + "─" * 50)
+                response_parts.append("📝 **相关信息和分析**\n")
+            
+            for result in text_results:
+                response_parts.append(result)
+        
+        # 🔧 添加其他结果
+        if other_results:
+            if image_results or text_results:
+                response_parts.append("\n" + "─" * 30)
+                response_parts.append("🔧 **其他信息**\n")
+            
+            for result in other_results:
+                response_parts.append(result)
+        
+        # 📊 添加执行统计
+        if image_results or text_results or other_results:
+            stats_info = self._generate_execution_stats(plan, len(image_results), len(text_results))
+            response_parts.append(stats_info)
+        
+        # 如果没有任何结果
+        if not response_parts:
+            return "执行完成，但未获得具体结果。"
+        
+        return "\n\n".join(response_parts)
+    
+    def _generate_image_introduction(self, query: str, image_count: int) -> str:
+        """🎨 生成图像介绍文本"""
+        if image_count == 1:
+            intro = f"🎨 **根据您的请求“{query}”，我为您生成了以下图像：**"
+        else:
+            intro = f"🎨 **根据您的请求“{query}”，我为您生成了 {image_count} 张相关图像：**"
+        return intro
+    
+    def _format_image_section(self, img_info: Dict, index: int, total: int) -> str:
+        """🖼️ 格式化单个图像信息部分"""
+        lines = []
+        
+        # 图像标题
+        if total > 1:
+            lines.append(f"### 🖼️ 图像 {index}/{total}")
+        else:
+            lines.append(f"### 🖼️ 生成的图像")
+        
+        # 文件信息
+        if img_info.get('filename'):
+            lines.append(f"📁 **文件名**: {img_info['filename']}")
+        
+        if img_info.get('saved_path'):
+            lines.append(f"💾 **保存路径**: `{img_info['saved_path']}`")
+        
+        # 图像详情
+        if img_info.get('prompt'):
+            lines.append(f"🎨 **生成提示词**: {img_info['prompt']}")
+        
+        if img_info.get('image_size'):
+            size = img_info['image_size']
+            if isinstance(size, (list, tuple)) and len(size) >= 2:
+                lines.append(f"📏 **图像尺寸**: {size[0]} x {size[1]} 像素")
+            else:
+                lines.append(f"📏 **图像尺寸**: {size}")
+        
+        if img_info.get('model'):
+            lines.append(f"🤖 **生成模型**: {img_info['model']}")
+        
+        if img_info.get('generated_at'):
+            lines.append(f"⏰ **生成时间**: {img_info['generated_at']}")
+        
+        # 状态信息
+        status = "✅ 生成成功" if img_info.get('success', True) else "❌ 生成失败"
+        lines.append(f"📊 **生成状态**: {status}")
+        
+        return "\n".join(lines)
+    
+    def _generate_execution_stats(self, plan: Plan, image_count: int, text_count: int) -> str:
+        """📊 生成执行统计信息"""
+        stats_lines = [
+            "\n" + "─" * 40,
+            "📊 **执行统计**",
+            f"🚀 执行了 {plan.action_count} 个工具行动",
+        ]
+        
+        if image_count > 0:
+            stats_lines.append(f"🎨 生成了 {image_count} 张图片")
+        
+        if text_count > 0:
+            stats_lines.append(f"📝 获得了 {text_count} 条文本结果")
+        
+        stats_lines.append("✨ **此响应由 Neogenesis 智能系统生成**")
+        
+        return "\n".join(stats_lines)
     
     def get_workflow_status(self) -> Dict[str, Any]:
         """获取工作流Agent的详细状态"""
