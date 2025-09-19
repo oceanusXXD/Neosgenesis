@@ -32,6 +32,7 @@ class ToolCategory(Enum):
     OPTIMIZATION = "optimization"  # 性能优化类工具
     DATA_PROCESSING = "data_processing"  # 数据处理类工具
     COMMUNICATION = "communication"      # 通信类工具
+    MEDIA = "media"            # 媒体处理工具（图像、音频、视频生成与处理）
 
 
 class ToolStatus(Enum):
