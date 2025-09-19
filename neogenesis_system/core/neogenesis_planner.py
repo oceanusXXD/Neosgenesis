@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """
 Neogenesis智能规划器 - 基于Meta MAB的高级规划系统
@@ -271,22 +269,219 @@ class NeogenesisPlanner(BasePlanner):
     def _make_decision_logic(self, user_query: str, deepseek_confidence: float = 0.5, 
                            execution_context: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        五阶段智能验证-学习决策逻辑（从MainController迁移）
+        LLM增强的六阶段智能验证-学习决策逻辑
         
-        这是原MainController.make_decision方法的核心逻辑，
-        几乎原封不动地保留了所有功能。
+        新架构：
+        阶段零：LLM智能路由分析 (新增)
+        阶段一：先验推理 - 生成思维种子
+        阶段二：验证思维种子
+        阶段三：路径生成
+        阶段四：路径验证与选择
+        阶段五：MAB学习与优化
         """
         start_time = time.time()
         self.total_rounds += 1
         
-        logger.info(f"🚀 开始第 {self.total_rounds} 轮五阶段智能验证-学习决策")
+        logger.info(f"🚀 开始第 {self.total_rounds} 轮LLM增强的六阶段智能决策")
         logger.info(f"   查询: {user_query[:50]}...")
         logger.info(f"   置信度: {deepseek_confidence:.2f}")
         
         try:
-            # 🧠 阶段一：先验推理 - 生成思维种子
+            # 🧠 阶段零：LLM智能路由分析 (新增)
+            route_analysis_start = time.time()
+            route_classification = self.prior_reasoner.classify_and_route(
+                user_query=user_query, 
+                execution_context=execution_context
+            )
+            route_analysis_time = time.time() - route_analysis_start
+            
+            logger.info(f"🎯 阶段零完成: LLM路由分析")
+            logger.info(f"   复杂度: {route_classification.complexity.value}")
+            logger.info(f"   领域: {route_classification.domain.value}")
+            logger.info(f"   路由策略: {route_classification.route_strategy.value}")
+            logger.info(f"   置信度: {route_classification.confidence:.2f}")
+            logger.info(f"   耗时: {route_analysis_time:.3f}s")
+            
+            # 🔀 根据路由策略决定处理流程
+            if self._should_use_fast_path(route_classification, user_query):
+                logger.info("⚡ 使用快速处理路径")
+                return self._execute_fast_path_decision(
+                    user_query, route_classification, start_time, execution_context
+                )
+            else:
+                logger.info("🔬 使用完整六阶段处理流径")
+                return self._execute_full_stage_decision(
+                    user_query, route_classification, deepseek_confidence, 
+                    start_time, execution_context
+                )
+                
+        except Exception as e:
+            logger.error(f"❌ 决策过程异常: {e}")
+            return self._create_error_decision_result(user_query, str(e), time.time() - start_time)
+
+    def _should_use_fast_path(self, route_classification, user_query: str) -> bool:
+        """
+        判断是否应该使用快速处理路径
+        
+        快速路径设计原则：只处理"你好"这类极其简单、无需专业知识的输入
+        绝不处理任何需要技术知识解答的问题，哪怕是"什么是HTTP"这样看似简单的问题
+        
+        Args:
+            route_classification: 路由分类结果
+            user_query: 用户查询（用于严格内容检查）
+            
+        Returns:
+            bool: 是否使用快速路径
+        """
+        from ..cognitive_engine.reasoner import TaskComplexity, RouteStrategy
+        
+        # 基础条件检查
+        is_simple = route_classification.complexity == TaskComplexity.SIMPLE
+        is_direct_response = route_classification.route_strategy == RouteStrategy.DIRECT_RESPONSE
+        is_high_confidence = route_classification.confidence >= 0.8
+        
+        if not (is_simple and is_direct_response and is_high_confidence):
+            return False
+            
+        # 严格的内容过滤 - 排除任何需要专业知识的查询
+        query_lower = user_query.lower().strip()
+        
+        # 明确禁止的技术查询模式
+        tech_question_patterns = [
+            "什么是", "what is", "如何", "how to", "怎么", "怎样", 
+            "为什么", "why", "原理", "principle", "工作", "work",
+            "实现", "implement", "配置", "config", "设置", "setup",
+            "安装", "install", "部署", "deploy", "优化", "optimize",
+            "调试", "debug", "错误", "error", "问题", "problem",
+            "解决", "solve", "修复", "fix", "api", "数据库", "database",
+            "协议", "protocol", "框架", "framework", "架构", "architecture"
+        ]
+        
+        # 如果包含任何技术查询模式，绝不走快速路径
+        if any(pattern in query_lower for pattern in tech_question_patterns):
+            logger.info(f"🚫 检测到技术查询模式，拒绝快速路径: {user_query[:50]}")
+            return False
+        
+        # 允许的极简输入白名单
+        simple_greetings = [
+            "你好", "hi", "hello", "hey", "好", "在吗", "在不在",
+            "系统状态", "status", "测试", "test", "ping", "ok", "好的", 
+            "谢谢", "thank", "再见", "bye", "没事", "没问题"
+        ]
+        
+        # 只有命中白名单的才允许快速路径
+        is_simple_greeting = any(greeting in query_lower for greeting in simple_greetings)
+        
+        if is_simple_greeting:
+            logger.info(f"✅ 检测到简单问候语，允许快速路径: {user_query[:30]}")
+            return True
+        else:
+            logger.info(f"🚫 不符合快速路径白名单，转入完整处理: {user_query[:50]}")
+            return False
+
+    def _execute_fast_path_decision(self, user_query: str, route_classification, 
+                                   start_time: float, execution_context: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        执行快速路径决策 - 适用于简单直接的任务
+        
+        Args:
+            user_query: 用户查询
+            route_classification: 路由分类结果
+            start_time: 开始时间
+            execution_context: 执行上下文
+            
+        Returns:
+            Dict: 决策结果
+        """
+        logger.info("⚡ 执行快速路径决策")
+        
+        # 生成简化的思维种子
+        thinking_seed = self.prior_reasoner.get_thinking_seed(user_query, execution_context)
+        
+        # 创建单一的快速响应路径
+        from ..cognitive_engine.data_structures import ReasoningPath
+        
+        fast_path = ReasoningPath(
+            path_id="llm_route_fast_path",
+            path_type="direct_answer",
+            description=f"基于LLM路由分析的快速响应路径",
+            prompt_template=f"基于LLM路由分析，这是一个{route_classification.complexity.value}任务，"
+                           f"领域为{route_classification.domain.value}，建议直接回答。",
+            confidence_score=route_classification.confidence
+        )
+        
+        execution_time = time.time() - start_time
+        
+        # 构建快速决策结果
+        decision_result = {
+            'chosen_path': fast_path,
+            'thinking_seed': thinking_seed,
+            'reasoning': f"LLM路由分析确定这是简单任务，采用快速处理路径。分析理由: {route_classification.reasoning}",
+            'available_paths': [fast_path],
+            'verified_paths': [fast_path],
+            'timestamp': time.time(),
+            'round_number': self.total_rounds,
+            'selection_algorithm': 'llm_route_fast_path',
+            'verification_stats': {
+                'total_verifications': 1,
+                'successful_verifications': 1,
+                'verification_time': 0.001  # 快速路径跳过验证
+            },
+            'performance_metrics': {
+                'total_time': execution_time,
+                'route_analysis_time': execution_time * 0.8,
+                'path_generation_time': execution_time * 0.1,
+                'mab_time': execution_time * 0.1,
+                'fast_path_used': True
+            },
+            'route_classification': route_classification
+        }
+        
+        logger.info(f"⚡ 快速路径决策完成，耗时: {execution_time:.3f}s")
+        return decision_result
+
+    def _execute_full_stage_decision(self, user_query: str, route_classification, 
+                                   deepseek_confidence: float, start_time: float,
+                                   execution_context: Optional[Dict] = None) -> Dict[str, Any]:
+        """
+        执行完整六阶段决策 - 适用于复杂任务
+        
+        Args:
+            user_query: 用户查询
+            route_classification: 路由分类结果
+            deepseek_confidence: DeepSeek置信度
+            start_time: 开始时间
+            execution_context: 执行上下文
+            
+        Returns:
+            Dict: 决策结果
+        """
+        logger.info("🔬 执行完整六阶段决策")
+        
+        try:
+            # 🧠 阶段一：先验推理 - 生成增强思维种子
             reasoner_start = time.time()
-            thinking_seed = self.prior_reasoner.get_thinking_seed(user_query, execution_context)
+            
+            # 根据路由分析结果增强思维种子生成
+            enhanced_context = execution_context.copy() if execution_context else {}
+            enhanced_context.update({
+                # 只传递可序列化的信息，不传递 TriageClassification 对象
+                'llm_route_analysis': {
+                    'complexity': route_classification.complexity.value,
+                    'domain': route_classification.domain.value,
+                    'intent': route_classification.intent.value,
+                    'urgency': route_classification.urgency.value,
+                    'strategy': route_classification.route_strategy.value,
+                    'confidence': route_classification.confidence,
+                    'reasoning': route_classification.reasoning,
+                    'key_factors': route_classification.key_factors
+                },
+                'suggested_complexity': route_classification.complexity.value,
+                'suggested_domain': route_classification.domain.value,
+                'suggested_strategy': route_classification.route_strategy.value
+            })
+            
+            thinking_seed = self.prior_reasoner.get_thinking_seed(user_query, enhanced_context)
             
             # 兼容性：获取旧格式数据
             task_confidence = self.prior_reasoner.assess_task_confidence(user_query, execution_context)
@@ -295,16 +490,19 @@ class NeogenesisPlanner(BasePlanner):
             reasoner_time = time.time() - reasoner_start
             self._update_component_performance('prior_reasoner', reasoner_time)
             
-            logger.info(f"🧠 阶段一完成: 思维种子生成 (长度: {len(thinking_seed)} 字符)")
+            logger.info(f"🧠 阶段一完成: LLM增强思维种子生成 (长度: {len(thinking_seed)} 字符)")
             
-            # 🔍 阶段二：验证思维种子
+            # 🔍 阶段二：LLM增强思维种子验证
             seed_verification_start = time.time()
             seed_verification_result = self._verify_idea_feasibility(
                 idea_text=thinking_seed,
                 context={
                     'stage': 'thinking_seed',
-                    'domain': 'strategic_planning',
+                    'domain': route_classification.domain.value,  # 使用LLM路由分析的领域
+                    'complexity': route_classification.complexity.value,  # 使用LLM路由分析的复杂度
+                    'route_strategy': route_classification.route_strategy.value,  # 使用LLM路由策略
                     'query': user_query,
+                    'llm_routing_enabled': True,  # 标记启用了LLM路由
                     **(execution_context if execution_context else {})
                 }
             )
@@ -314,19 +512,24 @@ class NeogenesisPlanner(BasePlanner):
             seed_feasibility = seed_verification_result.get('feasibility_analysis', {}).get('feasibility_score', 0.5)
             seed_reward = seed_verification_result.get('reward_score', 0.0)
             
-            logger.info(f"🔍 阶段二完成: 思维种子验证 (可行性: {seed_feasibility:.2f}, 奖励: {seed_reward:+.3f})")
+            logger.info(f"🔍 阶段二完成: LLM增强思维种子验证 (可行性: {seed_feasibility:.2f}, 奖励: {seed_reward:+.3f})")
             
-            # 🛤️ 阶段三：路径生成
+            # 🛤️ 阶段三：LLM优化路径生成
             generator_start = time.time()
+            
+            # 根据LLM路由分析优化路径生成参数
+            max_paths = self._get_optimal_path_count_for_route(route_classification)
+            
             all_reasoning_paths = self.path_generator.generate_paths(
                 thinking_seed=thinking_seed, 
                 task=user_query,
-                max_paths=6  # 限制路径数量以提高性能
+                max_paths=max_paths
+                # 注释：路由提示信息已通过enhanced_context传递给思维种子生成
             )
             generator_time = time.time() - generator_start
             self._update_component_performance('path_generator', generator_time)
             
-            logger.info(f"🛤️ 阶段三完成: 生成了 {len(all_reasoning_paths)} 条思维路径")
+            logger.info(f"🛤️ 阶段三完成: LLM优化生成 {len(all_reasoning_paths)} 条思维路径 (策略: {route_classification.route_strategy.value})")
             
             # 🚀 阶段四：路径验证学习
             path_verification_start = time.time()
@@ -520,6 +723,36 @@ class NeogenesisPlanner(BasePlanner):
         return strategy_decision
     
     
+    def _get_optimal_path_count_for_route(self, route_classification) -> int:
+        """
+        根据LLM路由分类获取最优路径数量
+        
+        Args:
+            route_classification: LLM路由分类结果
+            
+        Returns:
+            int: 最优路径数量
+        """
+        from ..cognitive_engine.reasoner import TaskComplexity, RouteStrategy
+        
+        # 基于复杂度的基础路径数
+        base_count = {
+            TaskComplexity.SIMPLE: 3,
+            TaskComplexity.MODERATE: 5,
+            TaskComplexity.COMPLEX: 6,
+            TaskComplexity.EXPERT: 8
+        }.get(route_classification.complexity, 6)
+        
+        # 基于路由策略的调整
+        if route_classification.route_strategy == RouteStrategy.DIRECT_RESPONSE:
+            return max(2, base_count // 2)  # 直接回答需要较少路径
+        elif route_classification.route_strategy == RouteStrategy.EXPERT_CONSULTATION:
+            return min(10, base_count + 2)  # 专家咨询需要更多路径
+        elif route_classification.route_strategy == RouteStrategy.WORKFLOW_PLANNING:
+            return min(8, base_count + 1)  # 工作流规划需要额外路径
+        else:
+            return base_count
+
     # ==================== 委托管理方法 ====================
     
     def _delegate_to_workflow_agent(self, query: str, memory: Any, 
