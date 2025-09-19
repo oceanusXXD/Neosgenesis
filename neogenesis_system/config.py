@@ -327,8 +327,8 @@ LLM_PROVIDERS_CONFIG = {
         "display_name": "Ollama (本地)",
         "provider_type": "ollama",
         "api_key_env": None,  # 本地服务不需要API密钥
-        "default_model": "llama2",
-        "available_models": ["llama2", "mistral", "codellama", "phi"],
+        "default_model": "deepseek-r1:7b",
+        "available_models": ["deepseek-r1:7b", "llama2", "mistral", "codellama", "phi"],
         "base_url": "http://localhost:11434",
         "max_tokens": 2000,
         "temperature": 0.7,
