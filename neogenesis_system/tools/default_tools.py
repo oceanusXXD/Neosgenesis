@@ -11,6 +11,13 @@ Default Tools - 默认工具定义
 from typing import Dict, Any, List
 from .tool_abstraction import BaseTool, ToolCategory, ToolResult
 
+# 导入图像生成工具
+try:
+    from .image_generation_tools import ImageGenerationTool, generate_image_simple
+    IMAGE_TOOLS_AVAILABLE = True
+except ImportError:
+    IMAGE_TOOLS_AVAILABLE = False
+
 
 class Tool:
     """简化的工具类，用于快速创建工具实例"""
@@ -32,11 +39,20 @@ class DefaultTools:
     @staticmethod
     def get_all_default_tools() -> List[Tool]:
         """获取所有默认工具"""
-        return [
+        tools = [
             DefaultTools.idea_verification_tool(),
             DefaultTools.search_tool(),
             DefaultTools.analysis_tool()
         ]
+        
+        # 添加图像生成工具（如果依赖可用）
+        if IMAGE_TOOLS_AVAILABLE:
+            tools.extend([
+                DefaultTools.image_generation_tool(),
+                DefaultTools.batch_image_generation_tool()
+            ])
+        
+        return tools
     
     @staticmethod
     def idea_verification_tool() -> Tool:
@@ -178,5 +194,101 @@ class DefaultTools:
             parameters={
                 "text": {"type": "str", "description": "要分析的文本"},
                 "analysis_type": {"type": "str", "description": "分析类型", "optional": True}
+            }
+        )
+    
+    @staticmethod
+    def image_generation_tool() -> Tool:
+        """图像生成工具"""
+        def generate_image(prompt: str, save_image: bool = True) -> Dict[str, Any]:
+            """
+            使用Stable Diffusion XL生成图像
+            
+            Args:
+                prompt: 图像生成提示词
+                save_image: 是否保存图像到本地
+                
+            Returns:
+                Dict[str, Any]: 生成结果
+            """
+            if not IMAGE_TOOLS_AVAILABLE:
+                return {
+                    "success": False,
+                    "error": "图像生成功能不可用。请安装依赖: pip install huggingface_hub Pillow",
+                    "result": None
+                }
+            
+            try:
+                tool_instance = ImageGenerationTool()
+                result = tool_instance.execute(prompt=prompt, save_image=save_image)
+                
+                return {
+                    "success": result.success,
+                    "error": result.error,
+                    "execution_time": result.execution_time,
+                    "result": result.result
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"图像生成失败: {str(e)}",
+                    "result": None
+                }
+        
+        return Tool(
+            name="generate_image",
+            description="使用Stable Diffusion XL 1.0模型生成高质量图像，支持中英文提示词",
+            function=generate_image,
+            parameters={
+                "prompt": {"type": "str", "description": "图像生成提示词，描述要生成的图像内容"},
+                "save_image": {"type": "bool", "description": "是否保存图像到本地", "optional": True}
+            }
+        )
+    
+    @staticmethod 
+    def batch_image_generation_tool() -> Tool:
+        """批量图像生成工具"""
+        def batch_generate_images(prompts: List[str], save_images: bool = True) -> Dict[str, Any]:
+            """
+            批量生成多张图像
+            
+            Args:
+                prompts: 提示词列表
+                save_images: 是否保存图像到本地
+                
+            Returns:
+                Dict[str, Any]: 批量生成结果
+            """
+            if not IMAGE_TOOLS_AVAILABLE:
+                return {
+                    "success": False,
+                    "error": "图像生成功能不可用。请安装依赖: pip install huggingface_hub Pillow",
+                    "results": []
+                }
+            
+            if not prompts:
+                return {
+                    "success": False,
+                    "error": "提示词列表不能为空",
+                    "results": []
+                }
+            
+            try:
+                from .image_generation_tools import batch_generate_images as batch_generate
+                return batch_generate(prompts, save_images)
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"批量图像生成失败: {str(e)}",
+                    "results": []
+                }
+        
+        return Tool(
+            name="batch_generate_images",
+            description="批量生成多张图像，输入多个提示词，返回所有生成结果",
+            function=batch_generate_images,
+            parameters={
+                "prompts": {"type": "List[str]", "description": "提示词列表"},
+                "save_images": {"type": "bool", "description": "是否保存图像到本地", "optional": True}
             }
         )
