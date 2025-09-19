@@ -10,6 +10,8 @@ import time
 import logging
 import requests
 import json
+import asyncio
+import aiohttp
 from typing import List, Optional, Union, Dict, Any
 
 from ..llm_base import (
@@ -185,6 +187,161 @@ class OllamaClient(BaseLLMClient):
             logger.error(f"❌ Ollama未知错误: {e}")
             return error_response
     
+    async def achat_completion(self, 
+                              messages: Union[str, List[LLMMessage]], 
+                              temperature: Optional[float] = None,
+                              max_tokens: Optional[int] = None,
+                              **kwargs) -> LLMResponse:
+        """
+        Ollama异步聊天完成接口实现
+        
+        Args:
+            messages: 消息内容
+            temperature: 温度参数
+            max_tokens: 最大token数
+            **kwargs: 其他参数
+            
+        Returns:
+            LLMResponse: 统一的响应对象
+        """
+        start_time = time.time()
+        
+        try:
+            # 准备消息格式
+            prepared_messages = self._prepare_messages(messages)
+            
+            # 转换为Ollama API格式
+            ollama_messages = []
+            for msg in prepared_messages:
+                ollama_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            
+            # 构建请求参数
+            request_data = {
+                "model": kwargs.get('model') or self.config.model_name,
+                "messages": ollama_messages,
+                "stream": False,  # 不使用流式响应
+                "options": {
+                    "temperature": temperature or self.config.temperature,
+                    "num_predict": max_tokens or self.config.max_tokens
+                }
+            }
+            
+            # 异步调用Ollama API
+            logger.debug(f"🤖 异步调用Ollama API: {request_data['model']}")
+            
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    f"{self.base_url}/api/chat",
+                    json=request_data
+                ) as response:
+                    response_time = time.time() - start_time
+                    
+                    # 检查响应状态
+                    if response.status != 200:
+                        return await self._handle_async_error_response(response, response_time)
+                    
+                    # 解析响应
+                    response_data = await response.json()
+                    content = response_data.get("message", {}).get("content", "")
+                    
+                    # 构建使用统计（Ollama通常不返回详细的token统计）
+                    usage = None
+                    if "usage" in response_data:
+                        usage_data = response_data["usage"]
+                        usage = LLMUsage(
+                            prompt_tokens=usage_data.get("prompt_tokens", 0),
+                            completion_tokens=usage_data.get("completion_tokens", 0),
+                            total_tokens=usage_data.get("total_tokens", 0)
+                        )
+                    
+                    # 构建响应对象
+                    llm_response = LLMResponse(
+                        success=True,
+                        content=content,
+                        provider=self.provider.value,
+                        model=request_data["model"],
+                        response_time=response_time,
+                        usage=usage,
+                        finish_reason=response_data.get("done_reason"),
+                        raw_response=response_data
+                    )
+                    
+                    # 更新统计
+                    self._update_stats(llm_response)
+                    
+                    logger.info(f"✅ Ollama异步API调用成功: {content[:50]}...")
+                    return llm_response
+            
+        except asyncio.TimeoutError as e:
+            response_time = time.time() - start_time
+            error_response = create_error_response(
+                provider=self.provider.value,
+                error_type=LLMErrorType.TIMEOUT_ERROR,
+                error_message=f"Ollama异步请求超时: {str(e)}",
+                response_time=response_time
+            )
+            self._update_stats(error_response)
+            logger.error(f"❌ Ollama异步请求超时: {e}")
+            return error_response
+            
+        except aiohttp.ClientError as e:
+            response_time = time.time() - start_time
+            error_response = create_error_response(
+                provider=self.provider.value,
+                error_type=LLMErrorType.NETWORK_ERROR,
+                error_message=f"Ollama异步网络错误: {str(e)}",
+                response_time=response_time
+            )
+            self._update_stats(error_response)
+            logger.error(f"❌ Ollama异步网络错误: {e}")
+            return error_response
+            
+        except Exception as e:
+            response_time = time.time() - start_time
+            error_response = create_error_response(
+                provider=self.provider.value,
+                error_type=LLMErrorType.UNKNOWN_ERROR,
+                error_message=f"Ollama异步未知错误: {str(e)}",
+                response_time=response_time
+            )
+            self._update_stats(error_response)
+            logger.error(f"❌ Ollama异步未知错误: {e}")
+            return error_response
+    
+    async def _handle_async_error_response(self, response: aiohttp.ClientResponse, response_time: float) -> LLMResponse:
+        """处理异步错误响应"""
+        error_type = LLMErrorType.UNKNOWN_ERROR
+        
+        if response.status == 404:
+            error_type = LLMErrorType.MODEL_ERROR
+            error_message = f"模型未找到: {self.config.model_name}"
+        elif response.status == 400:
+            error_type = LLMErrorType.INVALID_REQUEST
+            error_message = "请求参数无效"
+        elif response.status >= 500:
+            error_type = LLMErrorType.SERVER_ERROR
+            error_message = f"Ollama服务器错误: {response.status}"
+        else:
+            error_message = f"HTTP错误: {response.status}"
+        
+        try:
+            error_data = await response.json()
+            if "error" in error_data:
+                error_message = error_data["error"]
+        except:
+            pass
+        
+        return create_error_response(
+            provider=self.provider.value,
+            error_type=error_type,
+            error_message=error_message,
+            response_time=response_time
+        )
+    
     def _handle_error_response(self, response: requests.Response, response_time: float) -> LLMResponse:
         """处理错误响应"""
         error_type = LLMErrorType.UNKNOWN_ERROR
@@ -262,6 +419,7 @@ class OllamaClient(BaseLLMClient):
             logger.error(f"❌ 获取Ollama模型列表失败: {e}")
             # 返回常见的模型名称
             return [
+                "deepseek-r1:7b", "deepseek-r1:latest",    # DeepSeek系列（优先推荐）
                 "llama2", "llama2:7b", "llama2:13b",
                 "mistral", "mistral:7b",
                 "codellama", "codellama:7b",
@@ -287,7 +445,7 @@ class OllamaClient(BaseLLMClient):
         ]
 
 
-def create_ollama_client(model_name: str = "llama2", base_url: str = "http://localhost:11434", **kwargs) -> OllamaClient:
+def create_ollama_client(model_name: str = "deepseek-r1:7b", base_url: str = "http://localhost:11434", **kwargs) -> OllamaClient:
     """
     创建Ollama客户端的便捷函数
     
