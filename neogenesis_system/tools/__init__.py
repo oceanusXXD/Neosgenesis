@@ -38,6 +38,20 @@ from .tool_abstraction import (
 # 从 default_tools 导入 Tool 类和默认工具
 from .default_tools import Tool, DefaultTools
 
+# 从 image_generation_tools 导入图像生成工具（可选导入）
+try:
+    from .image_generation_tools import (
+        ImageGenerationTool, 
+        generate_image_simple, 
+        batch_generate_images,
+        get_image_generation_tools,
+        get_prompt_template,
+        IMAGE_PROMPT_TEMPLATES
+    )
+    IMAGE_TOOLS_AVAILABLE = True
+except ImportError:
+    IMAGE_TOOLS_AVAILABLE = False
+
 __all__ = [
     # 核心工具抽象
     "BaseTool",
@@ -75,3 +89,14 @@ __all__ = [
     "Tool",
     "DefaultTools"
 ]
+
+# 如果图像生成工具可用，添加到__all__中
+if IMAGE_TOOLS_AVAILABLE:
+    __all__.extend([
+        "ImageGenerationTool",
+        "generate_image_simple", 
+        "batch_generate_images",
+        "get_image_generation_tools",
+        "get_prompt_template",
+        "IMAGE_PROMPT_TEMPLATES"
+    ])
