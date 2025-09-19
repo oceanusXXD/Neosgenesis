@@ -37,6 +37,11 @@ class AnalysisTaskType(Enum):
     KEYWORD_EXTRACTION = "keyword_extraction"       # 关键词提取
     TOPIC_MODELING = "topic_modeling"               # 主题建模
     LANGUAGE_DETECTION = "language_detection"       # 语言检测
+    VISUAL_NEED_DETECTION = "visual_need_detection" # 视觉需求识别
+    OUTPUT_FORMAT_ANALYSIS = "output_format_analysis" # 输出形态分析（已弃用）
+    VISUAL_ENHANCEMENT_OPPORTUNITY = "visual_enhancement_opportunity" # 🎨 视觉增强机会评估
+    INTERACTION_CONTEXT_ANALYSIS = "interaction_context_analysis" # 🧠 交互情境分析
+    AESTHETIC_PREFERENCE_INFERENCE = "aesthetic_preference_inference" # 🎭 审美偏好推断
     CUSTOM_ANALYSIS = "custom_analysis"             # 自定义分析
 
 @dataclass
@@ -107,7 +112,6 @@ class SemanticAnalyzer:
             'max_retries': 3,  # 最大重试次数
             'timeout': 30,     # 请求超时时间
             'batch_size': 5,   # 批处理大小
-            'enable_fallback': True,  # 启用降级机制
             'confidence_threshold': 0.7,  # 默认置信度阈值
             'model_name': 'deepseek-chat',  # 默认模型
             'temperature': 0.1,  # 低温度保证结果稳定性
@@ -270,6 +274,240 @@ class SemanticAnalyzer:
 - Medium: 建议及时处理，有一定时间要求
 - High: 需要尽快处理，有明确期限
 - Critical: 需要立即处理，延迟会有严重后果
+
+请仅返回JSON，不要其他内容。"""
+        )
+        
+        # 视觉需求识别任务
+        tasks['visual_need_detection'] = AnalysisTask(
+            task_type=AnalysisTaskType.VISUAL_NEED_DETECTION,
+            description="识别用户查询是否需要视觉化表达或图像生成",
+            expected_output_format={
+                "needs_visual": "boolean",       # 是否需要视觉化
+                "visual_type": "string",         # 视觉化类型
+                "confidence": "float",           # 置信度
+                "visual_purpose": "string",      # 视觉化目的
+                "suggested_elements": ["string"] # 建议元素
+            },
+            prompt_template="""请分析以下文本是否需要视觉化表达或图像生成：
+
+文本: "{text}"
+
+请识别用户是否需要视觉内容并返回JSON格式结果：
+{{
+    "needs_visual": true/false - 是否需要生成或展示视觉内容,
+    "visual_type": "设计类型（如：logo, illustration, diagram, photo, art, ui_mockup, infographic等）",
+    "confidence": 0.0-1.0之间的置信度分数,
+    "visual_purpose": "视觉化的目的（如：展示概念、辅助说明、艺术创作、设计原型等）",
+    "suggested_elements": ["建议包含的视觉元素或特征列表"]
+}}
+
+判断标准：
+- 直接请求："画", "设计", "生成图片", "创作", "制作"等
+- 隐含需求："想象一下...", "展示...", "什么样子？", "如何看起来？"
+- 描述性内容：详细的外观、场景、风格描述
+- 设计相关：界面、logo、插图、原型等需求
+
+请仅返回JSON，不要其他内容。"""
+        )
+        
+        # 🎨 视觉增强机会评估任务 - 从"判断需求"升级为"评估机会"
+        tasks['visual_enhancement_opportunity'] = AnalysisTask(
+            task_type=AnalysisTaskType.VISUAL_ENHANCEMENT_OPPORTUNITY,
+            description="评估视觉内容增强用户体验的机会和潜力，不仅限于明确的图像请求",
+            expected_output_format={
+                # 基本判断
+                "has_visual_opportunity": "boolean",    # 是否存在视觉增强机会
+                "opportunity_strength": "float",       # 机会强度 (0.0-1.0)
+                "opportunity_type": "string",          # 机会类型
+                
+                # 情境分析
+                "context_analysis": {
+                    "conversation_tone": "string",     # 对话调性
+                    "user_emotional_state": "string",  # 用户情绪状态
+                    "content_complexity": "string",    # 内容复杂度
+                    "interaction_phase": "string"      # 交互阶段
+                },
+                
+                # 视觉建议
+                "visual_recommendations": {
+                    "primary_visual_type": "string",   # 主要视觉类型
+                    "style_suggestions": ["string"],   # 风格建议
+                    "mood_alignment": "string",        # 情绪匹配
+                    "aesthetic_direction": "string"    # 审美方向
+                },
+                
+                # 时机判断
+                "timing_assessment": {
+                    "generation_timing": "string",     # 生成时机
+                    "user_readiness": "float",         # 用户准备度
+                    "context_appropriateness": "float" # 情境适宜度
+                },
+                
+                # 个性化建议
+                "personalization": {
+                    "suggested_elements": ["string"],  # 建议元素
+                    "avoid_elements": ["string"],      # 需要避免的元素
+                    "cultural_considerations": "string" # 文化考量
+                }
+            },
+            prompt_template="""作为一名具备深度审美理解和情商的AI助手，请评估以下内容的视觉增强机会：
+
+用户输入: "{text}"
+
+请以一名经验丰富的交互设计师和情绪智能专家的视角，综合分析并返回JSON结果：
+
+{{
+    "has_visual_opportunity": true/false,
+    "opportunity_strength": 0.0-1.0之间的机会强度分数,
+    "opportunity_type": "机会类型（如：explicit_request, implicit_enhancement, educational_support, emotional_resonance, creative_inspiration）",
+    
+    "context_analysis": {{
+        "conversation_tone": "对话调性（如：formal, casual, playful, serious, creative, professional）",
+        "user_emotional_state": "用户情绪（如：curious, frustrated, excited, focused, overwhelmed, inspired）",
+        "content_complexity": "内容复杂度（如：simple, moderate, complex, highly_technical）",
+        "interaction_phase": "交互阶段（如：initial_inquiry, deep_exploration, problem_solving, creative_brainstorming）"
+    }},
+    
+    "visual_recommendations": {{
+        "primary_visual_type": "主要视觉类型（如：illustration, diagram, infographic, artistic_concept, ui_mockup, photo_realistic）",
+        "style_suggestions": ["风格建议列表、如：minimalist, vibrant, professional, whimsical, modern, classic"],
+        "mood_alignment": "情绪匹配（如：calm_and_focused, energetic_and_inspiring, warm_and_friendly, sleek_and_modern）",
+        "aesthetic_direction": "审美方向（如：clean_and_simple, rich_and_detailed, bold_and_dramatic, subtle_and_elegant）"
+    }},
+    
+    "timing_assessment": {{
+        "generation_timing": "生成时机（如：immediate, after_text_response, on_request, contextually_appropriate）",
+        "user_readiness": 0.0-1.0之间的用户准备度分数,
+        "context_appropriateness": 0.0-1.0之间的情境适宜度分数
+    }},
+    
+    "personalization": {{
+        "suggested_elements": ["建议包含的视觉元素列表"],
+        "avoid_elements": ["应避免的元素列表"],
+        "cultural_considerations": "文化敏感性考量和建议"
+    }}
+}}
+
+评估标准：
+1. **机会识别**：不仅识别明确的图像请求，更要挖掘隐含的视觉增强机会
+2. **情境敏感**：理解对话氛围、用户情绪和交互阶段
+3. **审美判断**：提供符合情境和用户需求的视觉风格建议
+4. **时机智能**：判断何时生成视觉内容最适宜
+5. **个性化适应**：基于内容和情境提供个性化建议
+
+请仅返回JSON，不要其他内容。"""
+        )
+        
+        # 🧠 交互情境分析任务 - 深度理解对话情境
+        tasks['interaction_context_analysis'] = AnalysisTask(
+            task_type=AnalysisTaskType.INTERACTION_CONTEXT_ANALYSIS,
+            description="分析当前交互的情境、氛围和用户状态，为视觉决策提供情境支持",
+            expected_output_format={
+                "interaction_context": {
+                    "session_continuity": "string",   # 会话连续性
+                    "topic_evolution": "string",      # 话题演化
+                    "user_engagement_level": "float"  # 用户参与度
+                },
+                "emotional_intelligence": {
+                    "detected_emotions": ["string"],  # 检测到的情绪
+                    "emotional_trajectory": "string", # 情绪轨迹
+                    "empathy_opportunities": ["string"] # 共情机会
+                },
+                "cognitive_load_assessment": {
+                    "information_density": "float",   # 信息密度
+                    "mental_effort_required": "string", # 所需心智努力
+                    "attention_span_match": "float"   # 注意力匹配度
+                }
+            },
+            prompt_template="""作为一名交互心理学和情绪智能专家，请分析以下交互情境：
+
+用户输入: "{text}"
+
+请返回JSON格式的情境分析：
+
+{{
+    "interaction_context": {{
+        "session_continuity": "会话连续性（new_topic, topic_deepening, follow_up, context_switch）",
+        "topic_evolution": "话题演化（introduction, exploration, refinement, conclusion）",
+        "user_engagement_level": 0.0-1.0之间的参与度分数
+    }},
+    
+    "emotional_intelligence": {{
+        "detected_emotions": ["检测到的情绪列表，如：curiosity, excitement, frustration, confidence"],
+        "emotional_trajectory": "情绪轨迹（如：steady_positive, growing_enthusiasm, initial_confusion_to_clarity）",
+        "empathy_opportunities": ["可以表达共情的机会列表"]
+    }},
+    
+    "cognitive_load_assessment": {{
+        "information_density": 0.0-1.0之间的信息密度分数,
+        "mental_effort_required": "所需心智努力级别（low, moderate, high, very_high）",
+        "attention_span_match": 0.0-1.0之间的注意力匹配度分数
+    }}
+}}
+
+分析重点：
+- 识别用户的情绪状态和参与程度
+- 评估当前交互的认知负荷
+- 找到共情和情绪连接的机会
+
+请仅返回JSON，不要其他内容。"""
+        )
+        
+        # 🎭 审美偏好推断任务 - 理解用户的视觉品味
+        tasks['aesthetic_preference_inference'] = AnalysisTask(
+            task_type=AnalysisTaskType.AESTHETIC_PREFERENCE_INFERENCE,
+            description="基于用户的表达方式、内容偏好和交互风格，推断其审美偏好",
+            expected_output_format={
+                "aesthetic_profile": {
+                    "style_preference": "string",     # 风格偏好
+                    "complexity_tolerance": "string", # 复杂度耐受度
+                    "color_personality": "string",    # 颜色个性
+                    "cultural_context": "string"      # 文化背景
+                },
+                "inferred_preferences": {
+                    "visual_elements": ["string"],    # 偏好的视觉元素
+                    "avoided_elements": ["string"],   # 可能不喜欢的元素
+                    "mood_preferences": ["string"]    # 情绪调性偏好
+                },
+                "confidence_metrics": {
+                    "preference_certainty": "float",  # 偏好确定性
+                    "cultural_accuracy": "float",     # 文化准确性
+                    "personalization_potential": "float" # 个性化潜力
+                }
+            },
+            prompt_template="""作为一名跨文化审美心理学和设计人类学专家，请分析用户的潜在审美偏好：
+
+用户输入: "{text}"
+
+请基于语言风格、表达方式、内容类型等线索，推断用户的审美偏好并返回JSON：
+
+{{
+    "aesthetic_profile": {{
+        "style_preference": "风格偏好（如：minimalist, maximalist, classic, modern, artistic, functional）",
+        "complexity_tolerance": "复杂度耐受度（low, moderate, high, very_high）",
+        "color_personality": "颜色个性（warm, cool, neutral, vibrant, muted, monochrome）",
+        "cultural_context": "文化背景推断（如：eastern, western, contemporary, traditional）"
+    }},
+    
+    "inferred_preferences": {{
+        "visual_elements": ["可能喜欢的视觉元素列表，如：clean_lines, organic_shapes, geometric_patterns"],
+        "avoided_elements": ["可能不喜欢的元素列表，如：clutter, harsh_contrasts, overly_decorative"],
+        "mood_preferences": ["情绪调性偏好，如：calm, energetic, sophisticated, playful"]
+    }},
+    
+    "confidence_metrics": {{
+        "preference_certainty": 0.0-1.0之间的偏好确定性分数,
+        "cultural_accuracy": 0.0-1.0之间的文化背景准确性分数,
+        "personalization_potential": 0.0-1.0之间的个性化潜力分数
+    }}
+}}
+
+推断依据：
+- 语言风格：正式/非正式、技术性/创意性等
+- 内容偏好：简洁/详细、抽象/具象等
+- 交互方式：直接/委婉、快速/深入等
+- 文化线索：表达习惯、价值观等
 
 请仅返回JSON，不要其他内容。"""
         )
@@ -452,8 +690,6 @@ class SemanticAnalyzer:
                 logger.info("🤖 自动创建LLM管理器")
             except ImportError:
                 logger.error("❌ 无法导入LLMManager，SemanticAnalyzer需要LLM支持")
-                if self.config['enable_fallback']:
-                    return self._fallback_analysis(prompt, task)
                 raise RuntimeError("SemanticAnalyzer requires LLM support")
         
         try:
@@ -482,229 +718,12 @@ class SemanticAnalyzer:
                 return response.content.strip()
             else:
                 error_msg = response.error_message if response else "LLM调用无响应"
-                logger.warning(f"⚠️ LLM调用失败: {error_msg}")
-                
-                if self.config['enable_fallback']:
-                    return self._fallback_analysis(prompt, task)
-                else:
-                    raise RuntimeError(f"LLM调用失败: {error_msg}")
+                logger.error(f"❌ LLM调用失败: {error_msg}")
+                raise RuntimeError(f"LLM调用失败: {error_msg}")
                 
         except Exception as e:
             logger.error(f"❌ LLM调用异常: {e}")
-            if self.config['enable_fallback']:
-                return self._fallback_analysis(prompt, task)
-            else:
-                raise
-    
-    def _fallback_analysis(self, prompt: str, task: AnalysisTask) -> str:
-        """降级分析方法 - 当LLM不可用时的简单规则分析"""
-        logger.warning("⚠️ 使用降级分析方法")
-        
-        # 提取文本进行简单分析
-        text = prompt.split('"')[1] if '"' in prompt else prompt
-        
-        # 简单的规则based分析作为降级
-        fallback_results = {
-            AnalysisTaskType.INTENT_DETECTION: self._fallback_intent_detection(text),
-            AnalysisTaskType.SENTIMENT_ANALYSIS: self._fallback_sentiment_analysis(text),
-            AnalysisTaskType.COMPLEXITY_ASSESSMENT: self._fallback_complexity_assessment(text),
-            AnalysisTaskType.DOMAIN_CLASSIFICATION: self._fallback_domain_classification(text),
-            AnalysisTaskType.URGENCY_EVALUATION: self._fallback_urgency_evaluation(text)
-        }
-        
-        result = fallback_results.get(task.task_type, {"status": "fallback_analysis", "confidence": 0.2})
-        return json.dumps(result, ensure_ascii=False)
-    
-    def _fallback_intent_detection(self, text: str) -> Dict[str, Any]:
-        """降级意图识别"""
-        text_lower = text.lower()
-        
-        # 简单的关键词匹配
-        question_indicators = ['什么', '如何', '怎么', '为什么', '哪里', '谁', 'what', 'how', 'why', 'where', 'who']
-        request_indicators = ['帮助', '需要', '请', '能否', '可以', 'help', 'please', 'can you', 'could you']
-        urgent_indicators = ['紧急', '急需', '立即', '马上', 'urgent', 'asap', 'immediately']
-        
-        primary_intent = "information_seeking"
-        confidence = 0.4
-        action_required = True
-        
-        if any(indicator in text_lower for indicator in question_indicators):
-            primary_intent = "question_asking"
-            confidence = 0.6
-        elif any(indicator in text_lower for indicator in request_indicators):
-            primary_intent = "help_request"
-            confidence = 0.7
-        elif any(indicator in text_lower for indicator in urgent_indicators):
-            primary_intent = "urgent_request"
-            confidence = 0.8
-        elif any(greeting in text_lower for greeting in ['你好', 'hello', 'hi']):
-            primary_intent = "greeting"
-            confidence = 0.9
-            action_required = False
-        
-        return {
-            "primary_intent": primary_intent,
-            "secondary_intents": [],
-            "confidence": confidence,
-            "intent_category": "query" if primary_intent in ["question_asking", "information_seeking"] else "request",
-            "action_required": action_required
-        }
-    
-    def _fallback_sentiment_analysis(self, text: str) -> Dict[str, Any]:
-        """降级情感分析"""
-        # 简单的正负面词汇统计
-        positive_words = ['好', '优秀', '棒', '赞', '喜欢', '满意', '成功', '有效', '创新', 'good', 'great', 'excellent', 'love', 'like']
-        negative_words = ['差', '坏', '糟糕', '失败', '问题', '困难', '错误', '不好', 'bad', 'terrible', 'fail', 'problem', 'difficult']
-        
-        text_lower = text.lower()
-        positive_count = sum(1 for word in positive_words if word in text_lower)
-        negative_count = sum(1 for word in negative_words if word in text_lower)
-        
-        if positive_count > negative_count:
-            overall_sentiment = "positive"
-            sentiment_score = min(0.8, 0.5 + (positive_count - negative_count) * 0.1)
-            intensity = "medium" if positive_count > 2 else "low"
-        elif negative_count > positive_count:
-            overall_sentiment = "negative"
-            sentiment_score = max(-0.8, -0.5 - (negative_count - positive_count) * 0.1)
-            intensity = "medium" if negative_count > 2 else "low"
-        else:
-            overall_sentiment = "neutral"
-            sentiment_score = 0.0
-            intensity = "low"
-        
-        return {
-            "overall_sentiment": overall_sentiment,
-            "sentiment_score": sentiment_score,
-            "emotions": {"trust": 0.5, "joy": max(0, sentiment_score)},
-            "emotional_intensity": intensity
-        }
-    
-    def _fallback_complexity_assessment(self, text: str) -> Dict[str, Any]:
-        """降级复杂度评估"""
-        text_lower = text.lower()
-        
-        # 基于文本长度和关键词的简单评估
-        complexity_score = 0.3  # 基础分数
-        
-        # 长度因素
-        if len(text) > 200:
-            complexity_score += 0.3
-        elif len(text) > 100:
-            complexity_score += 0.2
-        elif len(text) > 50:
-            complexity_score += 0.1
-        
-        # 复杂性指标
-        complex_indicators = ['设计', '架构', '系统', '算法', '优化', '深度', '详细', '全面', 'architecture', 'system', 'complex', 'advanced']
-        complexity_score += min(0.4, len([ind for ind in complex_indicators if ind in text_lower]) * 0.1)
-        
-        complexity_score = min(1.0, complexity_score)
-        
-        if complexity_score >= 0.7:
-            level = "high"
-            effort = "substantial"
-            expertise = True
-        elif complexity_score >= 0.5:
-            level = "medium"
-            effort = "moderate"
-            expertise = False
-        else:
-            level = "low"
-            effort = "minimal"
-            expertise = False
-        
-        return {
-            "complexity_level": level,
-            "complexity_score": complexity_score,
-            "complexity_factors": ["文本长度", "技术术语"] if complexity_score > 0.5 else ["简单任务"],
-            "estimated_effort": effort,
-            "requires_expertise": expertise
-        }
-    
-    def _fallback_domain_classification(self, text: str) -> Dict[str, Any]:
-        """降级领域分类"""
-        text_lower = text.lower()
-        
-        # 领域关键词映射
-        domain_keywords = {
-            "technology": ['技术', '编程', 'api', '算法', '数据库', '系统', '架构', 'programming', 'algorithm', 'database', 'system'],
-            "business": ['商业', '市场', '营销', '销售', '商务', '管理', 'business', 'marketing', 'sales', 'management'],
-            "academic": ['学术', '研究', '论文', '理论', '分析', '学习', 'academic', 'research', 'study', 'analysis'],
-            "creative": ['创意', '设计', '艺术', '创作', '想象', 'creative', 'design', 'art', 'imagination'],
-            "health": ['健康', '医疗', '保健', '医学', 'health', 'medical', 'healthcare'],
-            "general": []
-        }
-        
-        domain_scores = {}
-        for domain, keywords in domain_keywords.items():
-            score = sum(1 for keyword in keywords if keyword in text_lower)
-            if score > 0:
-                domain_scores[domain] = score / len(keywords) if keywords else 0
-        
-        if domain_scores:
-            primary_domain = max(domain_scores.items(), key=lambda x: x[1])[0]
-            confidence = min(0.8, domain_scores[primary_domain] * 2)
-        else:
-            primary_domain = "general"
-            confidence = 0.3
-        
-        return {
-            "primary_domain": primary_domain,
-            "secondary_domains": [d for d, s in domain_scores.items() if d != primary_domain and s > 0],
-            "domain_confidence": confidence,
-            "is_interdisciplinary": len(domain_scores) > 2,
-            "technical_level": "intermediate" if primary_domain == "technology" else "basic"
-        }
-    
-    def _fallback_urgency_evaluation(self, text: str) -> Dict[str, Any]:
-        """降级紧急程度评估"""
-        text_lower = text.lower()
-        
-        urgency_indicators = {
-            "critical": ['紧急', '急需', '立即', '马上', '现在', 'urgent', 'asap', 'immediately', 'now', 'critical'],
-            "high": ['尽快', '较快', '快速', 'soon', 'quickly', 'fast'],
-            "medium": ['一般', '普通', '正常', 'normal', 'regular'],
-            "low": ['慢慢', '有时间', '不急', '随时', 'whenever', 'no rush', 'slowly']
-        }
-        
-        urgency_level = "medium"  # 默认
-        urgency_score = 0.5
-        
-        for level, indicators in urgency_indicators.items():
-            if any(indicator in text_lower for indicator in indicators):
-                urgency_level = level
-                if level == "critical":
-                    urgency_score = 0.9
-                elif level == "high":
-                    urgency_score = 0.7
-                elif level == "medium":
-                    urgency_score = 0.5
-                else:  # low
-                    urgency_score = 0.3
-                break
-        
-        time_sensitivity_map = {
-            "critical": "immediate",
-            "high": "strict", 
-            "medium": "moderate",
-            "low": "flexible"
-        }
-        
-        priority_map = {
-            "critical": 9,
-            "high": 7,
-            "medium": 5,
-            "low": 3
-        }
-        
-        return {
-            "urgency_level": urgency_level,
-            "urgency_score": urgency_score,
-            "time_sensitivity": time_sensitivity_map[urgency_level],
-            "consequences": "可能影响后续工作" if urgency_score > 0.6 else "影响较小",
-            "priority_rank": priority_map[urgency_level]
-        }
+            raise
     
     def _generate_cache_key(self, text: str, tasks: List[AnalysisTask]) -> str:
         """生成缓存键"""
