@@ -285,7 +285,7 @@ class KnowledgeExplorer:
             if is_user_directed:
                 strategy = self._select_user_directed_strategy(targets, user_context)
             else:
-            strategy = self._select_optimal_strategy(targets)
+                strategy = self._select_optimal_strategy(targets)
         
         logger.info(f"🌐 开始知识探勘: {exploration_id} ({exploration_mode})")
         logger.info(f"   策略: {strategy.value}")
