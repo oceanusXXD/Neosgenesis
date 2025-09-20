@@ -9,7 +9,8 @@
 
 ## 🌟 让AI像专家一样思考 - 元认知智能决策的新突破
 
-[快速开始](#-快速开始) · [核心特色](#-核心创新重新定义ai决策流程) · [系统架构](#️-系统架构与技术栈) · [演示体验](#-演示体验) · [贡献指南](#-贡献指南) · [English](#-English README) 
+[快速开始](#-快速开始) · [核心特色](#-核心创新重新定义ai决策流程) · [系统架构](#️-系统架构与技术栈) · [演示体验](#-演示体验) · [贡献指南](#-贡献指南) · [English](./README_EN.md)
+
 
 
 </div>
@@ -59,8 +60,8 @@ flowchart LR
     E --> F[任务执行结果]
     F --> B
     
-    style B fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style B fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,stroke:#000000,color:#000000,font-weight:bold
+    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke:#000000,color:#000000,font-weight:bold
 ```
 
 ---
@@ -90,13 +91,13 @@ flowchart LR
         G -- 执行反馈 --> F
     end
 
-    style A fill:#e3f2fd
-    style B fill:#ffcdd2
-    style C fill:#e0f7fa
-    style D fill:#fff9c4
-    style E fill:#e8f5e9
-    style F fill:#ffecb3
-    style G fill:#f3e5f5
+    style A fill:#e3f2fd,stroke:#000000,color:#000000,font-weight:bold
+    style B fill:#ffcdd2,stroke:#000000,color:#000000,font-weight:bold
+    style C fill:#e0f7fa,stroke:#000000,color:#000000,font-weight:bold
+    style D fill:#fff9c4,stroke:#000000,color:#000000,font-weight:bold
+    style E fill:#e8f5e9,stroke:#000000,color:#000000,font-weight:bold
+    style F fill:#ffecb3,stroke:#000000,color:#000000,font-weight:bold
+    style G fill:#f3e5f5,stroke:#000000,color:#000000,font-weight:bold
 
 ```
 
@@ -150,57 +151,129 @@ Neogenesis System 采用高度模块化和可扩展的架构设计，各组件�
 
 ### 核心组件概览
 
-```startuml
-package "启动与演示层" {
-    UI : start_demo.py / interactive_demo.py
-}
+```mermaid
+graph TD
+    subgraph "展示与交互层"
+        UI["演示与交互界面"]
+    end
 
-package "核心控制层" {
-    MC : MainController (controller.py) 五阶段流程总协调
-}
+    subgraph "核心控制层"
+        MC["主控制器 - 五阶段流程协调"]
+    end
 
-package "决策逻辑层" {
-    PR : PriorReasoner (reasoner.py) 快速启发式分析
-    RAG : RAGSeedGenerator (rag_seed_generator.py) RAG增强种子生成
-    PG : PathGenerator (path_generator.py) 多路径思维生成
-    MAB : MABConverger (mab_converger.py) Meta-MAB与学习
-}
+    subgraph "LangChain 集成层"
+        LC_AD["LangChain 适配器 - LangChain 兼容性"]
+        LC_PS["持久化存储 - 多后端存储"]
+        LC_SM["状态管理 - ACID 事务"]
+        LC_DS["分布式状态 - 多节点同步"]
+        LC_AC["高级链 - 链工作流"]
+        LC_EE["执行引擎 - 并行处理"]
+        LC_CO["协调器 - 链协调"]
+        LC_TO["LangChain 工具 - 扩展工具库"]
+    end
 
-package "工具与服务层" {
-    DS : DeepSeekClient (deepseek_client.py) 强化版AI客户端
-    SC : SearchClient (search_client.py) 网络搜索与验证
-    PO : PerformanceOptimizer (performance_optimizer.py) 并行化与缓存
-    CFG : config.py (主/演示配置)
-}
+    subgraph "决策逻辑层"
+        PR["先验推理器 - 快速启发式分析"]
+        RAG["RAG种子生成器 - RAG增强思维种子"]
+        PG["路径生成器 - 多路径思维生成"]
+        MAB["MAB收敛器 - Meta-MAB与学习"]
+    end
 
-' 控制流
-UI --> MC
-MC --> PR
-MC --> RAG
-MC --> PG
-MC --> MAB
+    subgraph "工具抽象层"
+        TR["工具注册表 - 统一工具管理"]
+        WST["网络搜索工具"]
+        IVT["想法验证工具"]
+    end
 
-PR --> RAG
-RAG --> PG
-PG --> MAB
-MAB --> PG
+    subgraph "工具与服务层"
+        LLM["LLM管理器 - 多LLM提供管理"]
+        SC["搜索客户端 - 网页搜索与验证"]
+        PO["性能优化器 - 并行与缓存"]
+        CFG["配置 - 主/演示配置"]
+    end
 
-RAG --> SC
-RAG --> DS
-PG --> DS
-MAB --> DS
-MC --> SC
-MC --> PO
+    subgraph "存储后端"
+        FS["文件系统 - 版本化存储"]
+        SQL["SQLite - ACID 数据库"]
+        LMDB["LMDB - 高性能KV存储"]
+        MEM["内存 - 内存缓存"]
+        REDIS["Redis - 分布式缓存"]
+    end
 
-MC --> CFG
-PR --> CFG
-RAG --> CFG
-PG --> CFG
-MAB --> CFG
-DS --> CFG
-SC --> CFG
-PO --> CFG
-@enduml
+    subgraph "LLM提供商层"
+        OAI["OpenAI - GPT-3.5/4/4o"]
+        ANT["Anthropic - Claude-3 系列"]
+        DS["DeepSeek - deepseek-chat/coder"]
+        OLL["Ollama - 本地模型"]
+        AZ["Azure OpenAI - 企业模型"]
+    end
+
+    UI --> MC
+    MC --> LC_AD
+    LC_AD --> LC_CO
+    LC_CO --> LC_AC
+    LC_CO --> LC_EE
+    LC_AC --> LC_SM
+    LC_SM --> LC_PS
+    LC_DS --> LC_SM
+    LC_PS --> FS
+    LC_PS --> SQL
+    LC_PS --> LMDB
+    LC_PS --> MEM
+    LC_PS --> REDIS
+    
+    MC --> PR
+    MC --> RAG
+    MC --> PG
+    MC --> MAB
+    MC --> TR
+    
+    MAB --> LC_SM
+    RAG --> TR
+    RAG --> LLM
+    PG --> LLM
+    MAB --> PG
+    MC --> PO
+    TR --> WST
+    TR --> IVT
+    TR --> LC_TO
+    WST --> SC
+    IVT --> SC
+    LLM --> OAI
+    LLM --> ANT
+    LLM --> DS
+    LLM --> OLL
+    LLM --> AZ
+
+    style LC_AD fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000,font-weight:bold
+    style LC_PS fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000,font-weight:bold
+    style LC_SM fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000,font-weight:bold
+    style LC_DS fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000000,font-weight:bold
+    style UI fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000000,font-weight:bold
+    style MC fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000000,font-weight:bold
+    style PR fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000000,font-weight:bold
+    style RAG fill:#d1c4e9,stroke:#7b1fa2,stroke-width:2px,color:#000000,font-weight:bold
+    style PG fill:#b3e5fc,stroke:#0288d1,stroke-width:2px,color:#000000,font-weight:bold
+    style MAB fill:#c5e1a5,stroke:#689f38,stroke-width:2px,color:#000000,font-weight:bold
+    style TR fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000000,font-weight:bold
+    style WST fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000000,font-weight:bold
+    style IVT fill:#f0f4c3,stroke:#827717,stroke-width:2px,color:#000000,font-weight:bold
+    style LC_TO fill:#c5cae9,stroke:#3f51b5,stroke-width:2px,color:#000000,font-weight:bold
+    style LLM fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000000,font-weight:bold
+    style SC fill:#d7ccc8,stroke:#5d4037,stroke-width:2px,color:#000000,font-weight:bold
+    style PO fill:#b2dfdb,stroke:#00796b,stroke-width:2px,color:#000000,font-weight:bold
+    style CFG fill:#f8bbd0,stroke:#c2185b,stroke-width:2px,color:#000000,font-weight:bold
+    style FS fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px,color:#000000,font-weight:bold
+    style SQL fill:#c5cae9,stroke:#303f9f,stroke-width:2px,color:#000000,font-weight:bold
+    style LMDB fill:#b2dfdb,stroke:#00796b,stroke-width:2px,color:#000000,font-weight:bold
+    style MEM fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000000,font-weight:bold
+    style REDIS fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000000,font-weight:bold
+    style OAI fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000000,font-weight:bold
+    style ANT fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000000,font-weight:bold
+    style DS fill:#d1c4e9,stroke:#7b1fa2,stroke-width:2px,color:#000000,font-weight:bold
+    style OLL fill:#b3e5fc,stroke:#0288d1,stroke-width:2px,color:#000000,font-weight:bold
+    style AZ fill:#c5e1a5,stroke:#689f38,stroke-width:2px,color:#000000,font-weight:bold
+
 
 ```
 
