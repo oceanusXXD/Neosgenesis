@@ -76,21 +76,26 @@ Neogenesis System 的核心价值在于其独特的架构设计，它将决策�
 graph TD
     subgraph "AI 思考过程 (Thinking Process)"
         A[阶段一: 思维种子生成<br/>(RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证<br/>(Initial Feasibility Check)};
-        B --> C[阶段三: 多路径思维展开<br/>(Diverse Path Generation)];
+        B -->|通过验证| C[阶段三: 多路径思维展开<br/>(Diverse Path Generation)];
+        B -->|未通过| A;
         C --> D[阶段四: 路径验证与即时学习<br/>(Path Validation & Instant Learning)];
         D --> E[阶段五: 智慧决策诞生<br/>(Meta-MAB Final Decision)];
     end
 
     subgraph "实时学习循环 (Real-time Learning Loop)"
-        D -- "验证结果 (成功/失败)" --> F((MAB知识库更新));
-        F -- "更新权重" --> E;
+        D -- "验证结果反馈" --> F((MAB知识库更新));
+        F -- "权重优化" --> E;
+        E -- "决策结果" --> G[执行与环境交互];
+        G -- "执行反馈" --> F;
     end
 
     style A fill:#e3f2fd
+    style B fill:#ffcdd2
     style C fill:#e0f7fa
     style D fill:#fff9c4
     style E fill:#e8f5e9
     style F fill:#ffecb3
+    style G fill:#f3e5f5
 ```
 
 **专业价值**: 这种"思考即学习"的模式，使AI具备了前所未有的反思和预演能力。它模拟了人类专家在制定方案时，会反复在头脑中推演、评估不同方案可行性的过程，从而在早期阶段就淘汰劣质思路，聚焦于高潜力方向。
@@ -167,16 +172,52 @@ graph TD
         CFG[config.py<br/><b>(主/演示配置)</b>]
     end
 
+    %% 外部输入
+    USER[用户输入/问题] --> UI
+    
+    %% 核心控制流
     UI --> MC
-    MC --> PR & RAG
+    MC --> PR
+    MC --> RAG
     MC --> PG
     MC --> MAB
-    MC --> SC
+    
+    %% 决策逻辑层内部关系
+    PR -.-> RAG
+    RAG -.-> PG
+    PG -.-> MAB
+    MAB -.-> PG
+    
+    %% 工具服务调用
     RAG --> SC
     RAG --> DS
     PG --> DS
-    MAB --> PG
+    MAB --> DS
+    MC --> SC
     MC -- "使用" --> PO
+    
+    %% 配置依赖
+    MC -.-> CFG
+    PR -.-> CFG
+    RAG -.-> CFG
+    PG -.-> CFG
+    MAB -.-> CFG
+    DS -.-> CFG
+    SC -.-> CFG
+    PO -.-> CFG
+
+    %% 样式定义
+    style UI fill:#e1f5fe
+    style MC fill:#f3e5f5
+    style PR fill:#e8f5e9
+    style RAG fill:#e8f5e9
+    style PG fill:#e8f5e9
+    style MAB fill:#e8f5e9
+    style DS fill:#fff3e0
+    style SC fill:#fff3e0
+    style PO fill:#fff3e0
+    style CFG fill:#f5f5f5
+    style USER fill:#bbdefb
 ```
 
 **组件说明**:
