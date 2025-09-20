@@ -76,17 +76,17 @@ Neogenesis System 的核心价值在于其独特的架构设计，它将决策�
 ```mermaid
 flowchart LR
     subgraph Thinking_Process["AI 思考过程"]
-        A[阶段一: 思维种子生成 (RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证 (Initial Feasibility Check)}
-        B -->|通过验证| C[阶段三: 多路径思维展开 (Diverse Path Generation)]
+        A["阶段一: 思维种子生成 - RAG-Enhanced Seed Generation"] --> B{"阶段二: 种子方向验证 - Initial Feasibility Check"}
+        B -->|通过验证| C["阶段三: 多路径思维展开 - Diverse Path Generation"]
         B -->|未通过| A
-        C --> D[阶段四: 路径验证与即时学习 (Path Validation & Instant Learning)]
-        D --> E[阶段五: 智慧决策诞生 (Meta-MAB Final Decision)]
+        C --> D["阶段四: 路径验证与即时学习 - Path Validation & Instant Learning"]
+        D --> E["阶段五: 智慧决策诞生 - Meta-MAB Final Decision"]
     end
 
     subgraph Real_time_Learning_Loop["实时学习循环"]
         D -- 验证结果反馈 --> F((MAB知识库更新))
         F -- 权重优化 --> E
-        E -- 决策结果 --> G[执行与环境交互]
+        E -- 决策结果 --> G["执行与环境交互"]
         G -- 执行反馈 --> F
     end
 
@@ -97,6 +97,7 @@ flowchart LR
     style E fill:#e8f5e9
     style F fill:#ffecb3
     style G fill:#f3e5f5
+
 ```
 
 **专业价值**: 这种"思考即学习"的模式，使AI具备了前所未有的反思和预演能力。它模拟了人类专家在制定方案时，会反复在头脑中推演、评估不同方案可行性的过程，从而在早期阶段就淘汰劣质思路，聚焦于高潜力方向。
