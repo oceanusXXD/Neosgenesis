@@ -556,13 +556,14 @@ python -m pytest tests/
 
 <div align="center">
 
-**🌟 如果这个项目对您有帮助，请给我们一个Star！**
+# 🌟 如果这个项目对您有帮助，请给我们一个 Star！
 
 [![GitHub stars](https://img.shields.io/github/stars/your-repo/neogenesis-system.svg?style=social&label=Star)](../../stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/your-repo/neogenesis-system.svg?style=social&label=Fork)](../../network/members)
 
-## 让AI思考得更像专家，决策得更加智慧
+## 让 AI 思考更像专家，决策更智慧
 
-[🚀 立即开始](#-快速开始) | [📖 查看文档](docs/) | [💡 提出建议](../../issues/new)
+### 🔥 快速导航
+[🚀 快速开始](#-快速开始) | [📖 文档中心](docs/) | [💡 提建议](../../issues/new)
 
 </div>
