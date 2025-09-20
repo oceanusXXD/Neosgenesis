@@ -150,7 +150,7 @@ Neogenesis System 采用高度模块化和可扩展的架构设计，各组件�
 
 ### 核心组件概览
 
-@startuml
+```startuml
 package "启动与演示层" {
     UI : start_demo.py / interactive_demo.py
 }
@@ -202,6 +202,7 @@ SC --> CFG
 PO --> CFG
 @enduml
 
+```
 
 **组件说明**:
 
