@@ -74,19 +74,19 @@ Neogenesis System 的核心价值在于其独特的架构设计，它将决策�
 
 ```mermaid
 graph TD
-    subgraph "AI 思考过程 (Thinking Process)"
-        A[阶段一: 思维种子生成<br/>(RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证<br/>(Initial Feasibility Check)};
-        B -->|通过验证| C[阶段三: 多路径思维展开<br/>(Diverse Path Generation)];
-        B -->|未通过| A;
-        C --> D[阶段四: 路径验证与即时学习<br/>(Path Validation & Instant Learning)];
-        D --> E[阶段五: 智慧决策诞生<br/>(Meta-MAB Final Decision)];
+    subgraph Thinking_Process["AI 思考过程"]
+        A[阶段一: 思维种子生成\n(RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证\n(Initial Feasibility Check)}
+        B -->|通过验证| C[阶段三: 多路径思维展开\n(Diverse Path Generation)]
+        B -->|未通过| A
+        C --> D[阶段四: 路径验证与即时学习\n(Path Validation & Instant Learning)]
+        D --> E[阶段五: 智慧决策诞生\n(Meta-MAB Final Decision)]
     end
 
-    subgraph "实时学习循环 (Real-time Learning Loop)"
-        D -- "验证结果反馈" --> F((MAB知识库更新));
-        F -- "权重优化" --> E;
-        E -- "决策结果" --> G[执行与环境交互];
-        G -- "执行反馈" --> F;
+    subgraph Real_time_Learning_Loop["实时学习循环"]
+        D -- 验证结果反馈 --> F((MAB知识库更新))
+        F -- 权重优化 --> E
+        E -- 决策结果 --> G[执行与环境交互]
+        G -- 执行反馈 --> F
     end
 
     style A fill:#e3f2fd
@@ -96,6 +96,7 @@ graph TD
     style E fill:#e8f5e9
     style F fill:#ffecb3
     style G fill:#f3e5f5
+
 ```
 
 **专业价值**: 这种"思考即学习"的模式，使AI具备了前所未有的反思和预演能力。它模拟了人类专家在制定方案时，会反复在头脑中推演、评估不同方案可行性的过程，从而在早期阶段就淘汰劣质思路，聚焦于高潜力方向。
@@ -150,52 +151,52 @@ Neogenesis System 采用高度模块化和可扩展的架构设计，各组件�
 
 ```mermaid
 graph TD
-    subgraph "启动与演示层 (Launch & Demo Layer)"
+    subgraph Launch_and_Demo_Layer["启动与演示层"]
         UI[start_demo.py / interactive_demo.py]
     end
 
-    subgraph "核心控制层 (Core Control Layer)"
-        MC[MainController<br/><b>(controller.py)</b><br/>五阶段流程总协调]
+    subgraph Core_Control_Layer["核心控制层"]
+        MC[MainController\n(controller.py)\n五阶段流程总协调]
     end
 
-    subgraph "决策逻辑层 (Decision Logic Layer)"
-        PR[PriorReasoner<br/><b>(reasoner.py)</b><br/>快速启发式分析]
-        RAG[RAGSeedGenerator<br/><b>(rag_seed_generator.py)</b><br/>RAG增强种子生成]
-        PG[PathGenerator<br/><b>(path_generator.py)</b><br/>多路径思维生成]
-        MAB[MABConverger<br/><b>(mab_converger.py)</b><br/>Meta-MAB与学习]
+    subgraph Decision_Logic_Layer["决策逻辑层"]
+        PR[PriorReasoner\n(reasoner.py)\n快速启发式分析]
+        RAG[RAGSeedGenerator\n(rag_seed_generator.py)\nRAG增强种子生成]
+        PG[PathGenerator\n(path_generator.py)\n多路径思维生成]
+        MAB[MABConverger\n(mab_converger.py)\nMeta-MAB与学习]
     end
 
-    subgraph "工具与服务层 (Tools & Services Layer)"
-        DS[DeepSeekClient<br/><b>(deepseek_client.py)</b><br/>强化版AI客户端]
-        SC[SearchClient<br/><b>(search_client.py)</b><br/>网络搜索与验证]
-        PO[PerformanceOptimizer<br/><b>(performance_optimizer.py)</b><br/>并行化与缓存]
-        CFG[config.py<br/><b>(主/演示配置)</b>]
+    subgraph Tools_and_Services_Layer["工具与服务层"]
+        DS[DeepSeekClient\n(deepseek_client.py)\n强化版AI客户端]
+        SC[SearchClient\n(search_client.py)\n网络搜索与验证]
+        PO[PerformanceOptimizer\n(performance_optimizer.py)\n并行化与缓存]
+        CFG[config.py\n(主/演示配置)]
     end
 
     %% 外部输入
     USER[用户输入/问题] --> UI
-    
+
     %% 核心控制流
     UI --> MC
     MC --> PR
     MC --> RAG
     MC --> PG
     MC --> MAB
-    
+
     %% 决策逻辑层内部关系
     PR -.-> RAG
     RAG -.-> PG
     PG -.-> MAB
     MAB -.-> PG
-    
+
     %% 工具服务调用
     RAG --> SC
     RAG --> DS
     PG --> DS
     MAB --> DS
     MC --> SC
-    MC -- "使用" --> PO
-    
+    MC -- 使用 --> PO
+
     %% 配置依赖
     MC -.-> CFG
     PR -.-> CFG
