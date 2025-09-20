@@ -10,7 +10,10 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-
+base_dir = Path(__file__).parent.resolve()
+quick_demo_path = base_dir / "quick_demo.py"
+interactive_demo_path = base_dir / "interactive_demo.py"
+readme_file_path = base_dir / "README.md"
 def print_welcome():
     """显示欢迎界面"""
     print("""
@@ -51,27 +54,32 @@ def print_welcome():
 def check_system_requirements():
     """检查系统要求"""
     print("🔍 检查系统环境...")
-    
+
     # 检查Python版本
     if sys.version_info < (3, 7):
         print("❌ 需要Python 3.7或更高版本")
         print(f"   当前版本: {sys.version}")
         return False
-    
+
     print(f"✅ Python {sys.version_info.major}.{sys.version_info.minor}")
-    
+
+    # 获取 start_demo.py 所在目录
+    base_dir = Path(__file__).parent.resolve()
+
     # 检查必要文件
     required_files = [
         "quick_demo.py",
         "interactive_demo.py", 
         "run_demo.py"
     ]
-    
+
     for file_name in required_files:
-        if not Path(file_name).exists():
+        file_path = base_dir / file_name
+        print(file_path)
+        if not file_path.exists():
             print(f"❌ 缺少文件: {file_name}")
             return False
-    
+
     print("✅ 演示文件完整")
     return True
 
@@ -81,7 +89,7 @@ def run_quick_demo():
     print("💡 这是一个完全模拟的演示，无需任何配置")
     
     try:
-        result = subprocess.run([sys.executable, "quick_demo.py"], check=True)
+        result = subprocess.run([sys.executable, str(quick_demo_path)], check=True, cwd=base_dir)
         return result.returncode == 0
     except subprocess.CalledProcessError as e:
         print(f"❌ 快速演示运行失败: {e}")
@@ -107,7 +115,7 @@ def run_full_demo():
             return False
     
     try:
-        result = subprocess.run([sys.executable, "interactive_demo.py"], check=True)
+        result = subprocess.run([sys.executable, str(interactive_demo_path)], check=True, cwd=base_dir)
         return result.returncode == 0
     except subprocess.CalledProcessError as e:
         print(f"❌ 完整演示运行失败: {e}")
@@ -122,7 +130,7 @@ def show_documentation():
     print("\n📚 AI思维可视化系统文档")
     print("="*50)
     
-    readme_file = Path("DEMO_README.md")
+    readme_file = Path("README.md")
     if readme_file.exists():
         try:
             with open(readme_file, 'r', encoding='utf-8') as f:

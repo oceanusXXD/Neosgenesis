@@ -127,3 +127,7 @@ Thumbs.db
 storage_data/
 cache/
 logs/
+
+venv/
+__pycache__/
+*.pyc

@@ -20,6 +20,8 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
+from PIL import Image
+from pathlib import Path
 
 try:
     from huggingface_hub import InferenceClient

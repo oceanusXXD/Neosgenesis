@@ -340,17 +340,35 @@ LLM_PROVIDERS_CONFIG = {
         "cost_per_1k_tokens": {"input": 0.0, "output": 0.0},  # 本地免费
         "context_window": 4096,
         "enabled": False  # 默认禁用，需要本地Ollama服务
-    }
+    },
+    "suanli": {
+    "display_name": "Suanli Qwen3 Free",
+    "provider_type": "suanli",
+    "api_key_env": "SUANLI_API_KEY",       # 使用新的环境变量
+    "default_model": "free:Qwen3-30B-A3B",
+    "available_models": ["free:Qwen3-30B-A3B"],
+    "base_url": "https://api.suanli.cn/v1",
+    "max_tokens": 4000,
+    "temperature": 0.7,
+    "timeout": (15, 60),
+    "max_retries": 3,
+    "retry_delay_base": 2.0,
+    "request_interval": 1.0,
+    "features": ["chat", "reasoning", "chinese"],
+    "cost_per_1k_tokens": {"input": 0.0, "output": 0.0},  # 免费
+    "context_window": 128000,  # Qwen3 支持超长上下文
+    "enabled": True
+}
 }
 
 # 默认LLM配置
 DEFAULT_LLM_CONFIG = {
     "primary_provider": "auto",          # 主要提供商（auto=自动检测可用的提供商）
     "preferred_providers": [             # 首选提供商顺序（按优先级）
-        "deepseek", "openai", "anthropic", "ollama"
+        "suanli","deepseek", "openai", "anthropic", "ollama"
     ],
     "fallback_providers": [              # 回退提供商（按优先级）
-        "openai", "anthropic", "ollama", "deepseek"
+        "suanli","openai", "anthropic", "ollama", "deepseek"
     ],
     "auto_fallback": True,               # 是否自动回退
     "fallback_on_error": True,          # 错误时是否回退

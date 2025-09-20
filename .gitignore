@@ -1,0 +1,4 @@
+venv/
+neogenesis_system/__pycache__/
+neogenesis_system/cognitive_engine/__pycache__/
+

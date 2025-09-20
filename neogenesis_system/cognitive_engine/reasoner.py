@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
+logger = logging.getLogger(__name__)
 # LLM 相关导入
 try:
     from ..providers.llm_manager import LLMManager
@@ -31,7 +32,7 @@ except ImportError as e:
     logger.warning(f"LLM组件导入失败，将使用纯启发式模式: {e}")
     LLM_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+
 
 
 # ==================== 路由分类数据结构定义 ====================
