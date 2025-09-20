@@ -9,7 +9,8 @@
 
 ## 🌟 Making AI Think Like Experts - Metacognitive Decision Intelligence
 
-[Quick Start](#-quick-start) · [Core Features](#-core-innovations) · [Installation](#-installation) · [Usage](#-usage-examples)
+[Quick Start](#-quick-start) · [Core Features](#-core-innovations) · [Installation](#-installation) · [Usage](#-usage-examples)· [中文](./README.md)
+
 
 </div>
 
