@@ -40,7 +40,7 @@ try:
     from ..examples.neogenesis_planner_demo import NeogenesisAgent, AgentFactory
     from ..core.neogenesis_planner import NeogenesisPlanner
     from ..core.cognitive_scheduler import CognitiveScheduler
-    from ..core.retrospection_engine import RetrospectionEngine
+    from ..core.retrospection_engine import TaskRetrospectionEngine
     from ..providers.knowledge_explorer import KnowledgeExplorer
     from ..shared.state_manager import StateManager
     from ..config import get_default_config
