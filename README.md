@@ -2,16 +2,14 @@
 
 <div align="center">
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-orange.svg)](https://deepseek.com)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)  
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  
+[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek-orange.svg)](https://deepseek.com)  
 [![MAB](https://img.shields.io/badge/Algorithm-Multi--Armed%20Bandit-red.svg)](https://en.wikipedia.org/wiki/Multi-armed_bandit)
 
 ## 🌟 让AI像专家一样思考 - 元认知智能决策的新突破
 
 [快速开始](#-快速开始) · [核心特色](#-核心创新重新定义ai决策流程) · [系统架构](#️-系统架构与技术栈) · [演示体验](#-演示体验) · [贡献指南](#-贡献指南) · [English](./README_EN.md)
-
-
 
 </div>
 
@@ -23,28 +21,26 @@
 
 ### 🌟 为什么选择 Neogenesis？
 
-- **🧠 元认知突破**：AI不仅会思考问题，更会思考"如何思考"
-- **🔬 即时学习**：在思考阶段就获得反馈，告别传统"执行后才能学习"的局限
-- **💡 创新突破**：独创的Aha-Moment机制，让AI在困境中迸发创意
-- **🏆 智慧沉淀**：黄金模板系统，将成功经验固化为可复用的智慧
+- **🧠 元认知突破**：AI不仅会思考问题，更会思考"如何思考"  
+- **🔬 即时学习**：在思考阶段就获得反馈，告别传统"执行后才能学习"的局限  
+- **💡 创新突破**：独创的Aha-Moment机制，让AI在困境中迸发创意  
+- **🏆 智慧沉淀**：黄金模板系统，将成功经验固化为可复用的智慧  
 - **🌐 实时增强**：RAG技术融合，基于最新信息做出明智决策
 
 ---
 
 ## 🎯 框架定位：AI Agent 的认知内核
 
-很多用户会问：这是一个AI框架还是一个Agent框架？
+很多用户会问：这是一个AI框架还是一个Agent框架？  
 
 **答案是：Neogenesis System 是一个为智能体（Agent）构建"认知内核"的高级框架。**
 
 ### 与其他框架的区别与互补
 
-#### 🔬 与通用AI框架的区别 (如 TensorFlow/PyTorch)
-
+#### 🔬 与通用AI框架的区别 (如 TensorFlow/PyTorch)  
 本项目不关注底层模型训练，而是聚焦于如何组织和调度预训练好的大语言模型（LLM）来完成复杂的认知任务。
 
-#### 🤝 与传统Agent框架的互补 (如 LangChain)
-
+#### 🤝 与传统Agent框架的互补 (如 LangChain)  
 传统的Agent框架更侧重于工具调用、任务编排和与外部环境交互的"行动循环"。Neogenesis 则专注于Agent在做出具体行动之前的"内在思考循环"——即如何进行高质量的规划、推理、反思和决策。
 
 ### 🧠 核心价值定位
@@ -98,7 +94,6 @@ flowchart LR
     style E fill:#e8f5e9,stroke:#000000,color:#000000,font-weight:bold
     style F fill:#ffecb3,stroke:#000000,color:#000000,font-weight:bold
     style G fill:#f3e5f5,stroke:#000000,color:#000000,font-weight:bold
-
 ```
 
 **专业价值**: 这种"思考即学习"的模式，使AI具备了前所未有的反思和预演能力。它模拟了人类专家在制定方案时，会反复在头脑中推演、评估不同方案可行性的过程，从而在早期阶段就淘汰劣质思路，聚焦于高潜力方向。
@@ -123,8 +118,8 @@ flowchart LR
 
 当系统面临以下困境时，将触发此机制：
 
-- 所有常规思维路径的置信度都低于阈值
-- 系统决策连续多次失败
+- 所有常规思维路径的置信度都低于阈值  
+- 系统决策连续多次失败  
 - 所有路径在实时验证阶段均被判定为不可行
 
 **创新点**: 触发后，系统会启动creative_bypass（创造性绕道）模式，强制PathGenerator生成一批非常规、高创新性的思维路径，并将其注入决策池，从而打破思维僵局。
@@ -137,8 +132,7 @@ flowchart LR
 
 **创新点**:
 
-- **RAG种子生成**: RAGSeedGenerator在生成最初的"思维种子"时，会先智能分析问题，形成搜索策略，然后通过search_client获取互联网上的实时、相关信息，最后综合这些信息生成一个基于事实的、上下文丰富的思考起点。
-
+- **RAG种子生成**: RAGSeedGenerator在生成最初的"思维种子"时，会先智能分析问题，形成搜索策略，然后通过search_client获取互联网上的实时、相关信息，最后综合这些信息生成一个基于事实的、上下文丰富的思考起点。  
 - **RAG实时验证**: 在决策流程的第二和第四阶段，MainController会调用verify_idea_feasibility方法，利用搜索引擎验证"思维种子"和每一条"思维路径"的现实可行性，并将验证结果作为即时反馈提供给MAB系统。
 
 **专业价值**: RAG的整合确保了AI的思考**"脚踏实地"**，其决策不仅基于模型内部的知识，更与当前世界的最新信息保持同步。这极大地提升了决策的时效性、准确性和可靠性。
@@ -273,26 +267,24 @@ graph TD
     style DS fill:#d1c4e9,stroke:#7b1fa2,stroke-width:2px,color:#000000,font-weight:bold
     style OLL fill:#b3e5fc,stroke:#0288d1,stroke-width:2px,color:#000000,font-weight:bold
     style AZ fill:#c5e1a5,stroke:#689f38,stroke-width:2px,color:#000000,font-weight:bold
-
-
 ```
 
 **组件说明**:
 
-- **MainController**: 系统的总指挥，负责编排完整的五阶段决策流程
-- **RAGSeedGenerator / PriorReasoner**: 决策的起点，负责生成高质量的"思维种子"
-- **PathGenerator**: 系统的"发散思维"模块，基于种子生成多样化的解决方案
-- **MABConverger**: 系统的"收敛思维"与"学习"模块，负责评估和选择，并从经验中学习
+- **MainController**: 系统的总指挥，负责编排完整的五阶段决策流程  
+- **RAGSeedGenerator / PriorReasoner**: 决策的起点，负责生成高质量的"思维种子"  
+- **PathGenerator**: 系统的"发散思维"模块，基于种子生成多样化的解决方案  
+- **MABConverger**: 系统的"收敛思维"与"学习"模块，负责评估和选择，并从经验中学习  
 - **工具层**: 提供了如强化API客户端、搜索引擎、性能优化器等可复用的底层能力
 
 ### 🔧 技术栈
 
 **核心技术**:
 
-- **核心语言**: Python 3.8+
-- **AI引擎**: DeepSeek Chat API
-- **核心算法**: Meta Multi-Armed Bandit (Thompson Sampling, UCB, Epsilon-Greedy), Retrieval-Augmented Generation (RAG)
-- **外部服务**: DuckDuckGo Search
+- **核心语言**: Python 3.8+  
+- **AI引擎**: DeepSeek Chat API  
+- **核心算法**: Meta Multi-Armed Bandit (Thompson Sampling, UCB, Epsilon-Greedy), Retrieval-Augmented Generation (RAG)  
+- **外部服务**: DuckDuckGo Search  
 - **关键库**: requests, numpy, duckduckgo-search
 
 ---
@@ -301,38 +293,38 @@ graph TD
 
 ### 环境要求
 
-- Python 3.8 或更高版本
+- Python 3.8 或更高版本  
 - pip 包管理器
 
 ### 安装与配置
 
 1. **克隆仓库**
 
-   ```bash
-   git clone https://github.com/your-repo/neogenesis-system.git
-   cd neogenesis-system
-   ```
+```bash
+git clone https://github.com/your-repo/neogenesis-system.git
+cd neogenesis-system
+```
 
 2. **安装依赖**
 
-   ```bash
-   # (推荐) 创建并激活虚拟环境
-   python -m venv venv
-   source venv/bin/activate  # on Windows: venv\Scripts\activate
+```bash
+# (推荐) 创建并激活虚拟环境
+python -m venv venv
+source venv/bin/activate  # on Windows: venv\Scripts\activate
 
-   # 安装依赖包
-   pip install -r requirements.txt
-   ```
+# 安装依赖包
+pip install -r requirements.txt
+```
 
 3. **配置API密钥 (可选，但推荐)**
 
-   在项目根目录下创建一个 `.env` 文件，并填入您的DeepSeek API密钥：
+在项目根目录下创建一个 `.env` 文件，并填入您的DeepSeek API密钥：
 
-   ```bash
-   DEEPSEEK_API_KEY="your_deepseek_api_key"
-   ```
+```bash
+DEEPSEEK_API_KEY="your_deepseek_api_key"
+```
 
-   如果没有密钥，系统将以功能受限的模拟模式运行。
+如果没有密钥，系统将以功能受限的模拟模式运行。
 
 ### 🎭 演示体验
 
@@ -398,6 +390,21 @@ print("\n✅ AI已接收反馈并完成学习！")
 | 🧠 路径生成成功率 | 95%+ | 多样化思维路径生成 |
 | 🏆 黄金模板命中率 | 60%+ | 成功经验复用效率 |
 | 💡 Aha-Moment触发率 | 15%+ | 创新突破场景占比 |
+
+### 补充指标（扩展）
+
+| 指标 | 表现 | 说明 |
+|------|------|------|
+| 🔧 工具集成成功率 | 92%+ | 工具增强验证的可靠性 |
+| 🔍 工具发现准确率 | 88%+ | 为上下文选择正确工具的能力 |
+| 🚀 工具增强决策质量提升 | +25% | 使用外部工具后决策质量的相对提升 |
+| 🎯 混合选择准确率 | 94%+ | MAB+LLM 融合策略的精度 |
+| 🧠 冷启动检测率 | 96%+ | 精确识别不熟悉工具/场景的能力 |
+| ⚡ 经验模式效率 | +40% | 对熟悉工具的性能提升 |
+| 🔍 探索模式成功率 | 89%+ | LLM 引导下工具发现的效果 |
+| 📈 学习收敛速度 | 3-5 次 | MAB 优化的学习曲线 |
+| 🤖 提供商可用性 | 99%+ | 多 LLM 提供商的冗余可用性 |
+| 🔄 自动故障切换成功率 | 98%+ | 无缝切换提供商的成功率 |
 
 ---
 
@@ -475,6 +482,137 @@ result = controller.make_decision(
 )
 ```
 
+### 🔧 Tool-Enhanced 决策示例（补充）
+
+```python
+# Tool-enhanced technical decisions with real-time information gathering
+result = controller.make_decision(
+    "Should we adopt Kubernetes for our microservices architecture?",
+    execution_context={
+        "domain": "system_architecture",
+        "team_size": "10_engineers", 
+        "current_stack": ["docker", "aws"],
+        "constraints": ["learning_curve", "migration_complexity"]
+    }
+)
+
+# The system automatically:
+# 1. Uses WebSearchTool to gather latest Kubernetes trends and best practices
+# 2. Applies IdeaVerificationTool to validate feasibility based on team constraints
+# 3. Integrates real-time information into decision-making process
+# 4. Provides evidence-based recommendations with source citations
+
+print(f"Tool-enhanced decision: {result.get('chosen_path', {}).get('description', 'N/A')}")
+print(f"Tools used: {result.get('tools_used', [])}")
+print(f"Information sources: {result.get('verification_sources', [])}")
+```
+
+### 🤖 Multi-LLM 提供商管理（补充）
+
+```python
+# Check available providers and their status
+status = controller.get_llm_provider_status()
+print(f"Healthy providers: {status['healthy_providers']}")
+
+# Switch to a specific provider for particular tasks
+controller.switch_llm_provider("anthropic")  # Use Claude for complex reasoning
+result_reasoning = controller.make_decision("Complex philosophical analysis...")
+
+controller.switch_llm_provider("deepseek")   # Use DeepSeek for coding tasks
+result_coding = controller.make_decision("Optimize this Python algorithm...")
+
+controller.switch_llm_provider("openai")     # Use GPT for general tasks
+result_general = controller.make_decision("Business strategy planning...")
+
+# Get cost and usage statistics
+cost_summary = controller.get_llm_cost_summary()
+print(f"Total cost: ${cost_summary['total_cost_usd']:.4f}")
+print(f"Requests by provider: {cost_summary['cost_by_provider']}")
+
+# Run health check on all providers
+health_status = controller.run_llm_health_check()
+print(f"Provider health: {health_status}")
+```
+
+---
+
+## ⚙️ LangChain 集成（补充）
+
+### 安装（可选依赖）
+
+```bash
+# Install core LangChain integration dependencies
+pip install langchain langchain-community
+
+# Install storage backend dependencies
+pip install lmdb                    # For LMDB high-performance storage
+pip install redis                   # For Redis distributed storage
+pip install sqlalchemy              # For enhanced SQL operations
+
+# Install distributed coordination dependencies  
+pip install aioredis                # For async Redis operations
+pip install consul                  # For service discovery (optional)
+```
+
+### 高级链 & 并行执行（补充）
+
+```python
+from neogenesis_system.langchain_integration import (
+    create_neogenesis_chain, 
+    PersistentStateManager,
+    AdvancedChainComposer
+)
+
+# Create LangChain-compatible Neogenesis chain
+neogenesis_chain = create_neogenesis_chain(
+    storage_backend="lmdb",
+    enable_distributed_state=True,
+    session_persistence=True
+)
+
+# Use as standard LangChain component
+from langchain.chains import SequentialChain
+
+# Integrate with existing LangChain workflows
+full_workflow = SequentialChain(chains=[
+    preprocessing_chain,       # Standard LangChain chain
+    neogenesis_chain,         # Our intelligent decision engine
+    postprocessing_chain      # Standard LangChain chain
+])
+
+# Execute with persistent state
+result = full_workflow.run({
+    "input": "Design scalable microservices architecture",
+    "context": {"team_size": 15, "timeline": "6_months"}
+})
+```
+
+### 并行分析 & 分布式集群 示例（补充）
+
+```python
+# Parallel & Distributed examples (see README_EN for full samples)
+from neogenesis_system.langchain_integration.advanced_chains import AdvancedChainComposer
+from neogenesis_system.langchain_integration.execution_engines import ParallelExecutionEngine
+from neogenesis_system.langchain_integration.distributed_state import DistributedStateManager
+from neogenesis_system.langchain_integration.coordinators import ClusterCoordinator
+
+# Parallel execution engine
+composer = AdvancedChainComposer()
+execution_engine = ParallelExecutionEngine(max_workers=6)
+
+# Distributed coordination
+distributed_state = DistributedStateManager(
+    node_id="decision_node_1",
+    cluster_nodes=["node_1:8001", "node_2:8002", "node_3:8003"],
+    consensus_protocol="raft"
+)
+
+cluster_coordinator = ClusterCoordinator(
+    distributed_state=distributed_state,
+    load_balancing="intelligent"
+)
+```
+
 ---
 
 ## 🤝 贡献指南
@@ -483,10 +621,12 @@ result = controller.make_decision(
 
 ### 贡献方式
 
-1. **🐛 Bug报告**：发现问题请提交Issue
-2. **✨ 功能建议**：提出新功能想法
-3. **📝 文档改进**：完善文档和示例
-4. **🔧 代码贡献**：提交Pull Request
+1. **🐛 Bug报告**：发现问题请提交Issue  
+2. **✨ 功能建议**：提出新功能想法  
+3. **📝 文档改进**：完善文档和示例  
+4. **🔧 代码贡献**：提交Pull Request  
+5. **🔨 工具开发**：为系统创建新的工具（实现 BaseTool 接口）  
+6. **🧪 工具测试**：参与工具集成测试与验证，确保工具与决策引擎的兼容性和稳定性
 
 ### 开发指南
 
@@ -522,16 +662,16 @@ python -m pytest tests/
 
 ### 核心技术致谢
 
-- **DeepSeek AI**：提供强大的大语言模型能力
-- **Multi-Armed Bandit理论**：为智能决策提供算法基础
-- **RAG技术**：实现知识增强的思维生成
+- **DeepSeek AI**：提供强大的大语言模型能力  
+- **Multi-Armed Bandit理论**：为智能决策提供算法基础  
+- **RAG技术**：实现知识增强的思维生成  
 - **元认知理论**：启发了系统的整体架构设计
 
 ### 开发团队
 
-- **架构设计**：Neogenesis Team
-- **算法实现**：MAB & RAG专家组
-- **工程开发**：Full-Stack开发团队
+- **架构设计**：Neogenesis Team  
+- **算法实现**：MAB & RAG专家组  
+- **工程开发**：Full-Stack开发团队  
 - **测试验证**：QA & Research团队
 
 ---
@@ -540,16 +680,16 @@ python -m pytest tests/
 
 ### 获取帮助
 
-- **📖 文档Wiki**：[项目文档](docs/)
-- **💬 讨论社区**：[GitHub Discussions](../../discussions)
-- **🐛 问题反馈**：[GitHub Issues](../../issues)
-- **📧 邮件联系**：[team@neogenesis.ai](mailto:team@neogenesis.ai)
+- **📖 文档Wiki**：docs/  
+- **💬 讨论社区**：[GitHub Discussions](../../discussions)  
+- **🐛 问题反馈**：[GitHub Issues](../../issues)  
+- **📧 邮件联系**：
 
 ### 路线图
 
-- **v1.1**：增强RAG信息源，支持更多搜索引擎
-- **v1.2**：多语言支持，国际化部署
-- **v1.3**：可视化决策流程，Web界面
+- **v1.1**：增强RAG信息源，支持更多搜索引擎  
+- **v1.2**：多语言支持，国际化部署  
+- **v1.3**：可视化决策流程，Web界面  
 - **v2.0**：分布式部署，企业级集成
 
 ---
@@ -558,12 +698,12 @@ python -m pytest tests/
 
 # 🌟 如果这个项目对您有帮助，请给我们一个 Star！
 
-[![GitHub stars](https://img.shields.io/github/stars/your-repo/neogenesis-system.svg?style=social&label=Star)](../../stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/your-repo/neogenesis-system.svg?style=social&label=Star)](../../stargazers)  
 [![GitHub forks](https://img.shields.io/github/forks/your-repo/neogenesis-system.svg?style=social&label=Fork)](../../network/members)
 
 ## 让 AI 思考更像专家，决策更智慧
 
-### 🔥 快速导航
+### 🔥 快速导航  
 [🚀 快速开始](#-快速开始) | [📖 文档中心](docs/) | [💡 提建议](../../issues/new)
 
 </div>
