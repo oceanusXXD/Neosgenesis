@@ -75,11 +75,11 @@ Neogenesis System 的核心价值在于其独特的架构设计，它将决策�
 ```mermaid
 graph TD
     subgraph Thinking_Process["AI 思考过程"]
-        A[阶段一: 思维种子生成\n(RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证\n(Initial Feasibility Check)}
-        B -->|通过验证| C[阶段三: 多路径思维展开\n(Diverse Path Generation)]
+        A[阶段一: 思维种子生成 (RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证 (Initial Feasibility Check)}
+        B -->|通过验证| C[阶段三: 多路径思维展开 (Diverse Path Generation)]
         B -->|未通过| A
-        C --> D[阶段四: 路径验证与即时学习\n(Path Validation & Instant Learning)]
-        D --> E[阶段五: 智慧决策诞生\n(Meta-MAB Final Decision)]
+        C --> D[阶段四: 路径验证与即时学习 (Path Validation & Instant Learning)]
+        D --> E[阶段五: 智慧决策诞生 (Meta-MAB Final Decision)]
     end
 
     subgraph Real_time_Learning_Loop["实时学习循环"]
@@ -96,6 +96,7 @@ graph TD
     style E fill:#e8f5e9
     style F fill:#ffecb3
     style G fill:#f3e5f5
+
 
 ```
 
@@ -156,21 +157,21 @@ graph TD
     end
 
     subgraph Core_Control_Layer["核心控制层"]
-        MC[MainController\n(controller.py)\n五阶段流程总协调]
+        MC[MainController (controller.py) 五阶段流程总协调]
     end
 
     subgraph Decision_Logic_Layer["决策逻辑层"]
-        PR[PriorReasoner\n(reasoner.py)\n快速启发式分析]
-        RAG[RAGSeedGenerator\n(rag_seed_generator.py)\nRAG增强种子生成]
-        PG[PathGenerator\n(path_generator.py)\n多路径思维生成]
-        MAB[MABConverger\n(mab_converger.py)\nMeta-MAB与学习]
+        PR[PriorReasoner (reasoner.py) 快速启发式分析]
+        RAG[RAGSeedGenerator (rag_seed_generator.py) RAG增强种子生成]
+        PG[PathGenerator (path_generator.py) 多路径思维生成]
+        MAB[MABConverger (mab_converger.py) Meta-MAB与学习]
     end
 
     subgraph Tools_and_Services_Layer["工具与服务层"]
-        DS[DeepSeekClient\n(deepseek_client.py)\n强化版AI客户端]
-        SC[SearchClient\n(search_client.py)\n网络搜索与验证]
-        PO[PerformanceOptimizer\n(performance_optimizer.py)\n并行化与缓存]
-        CFG[config.py\n(主/演示配置)]
+        DS[DeepSeekClient (deepseek_client.py) 强化版AI客户端]
+        SC[SearchClient (search_client.py) 网络搜索与验证]
+        PO[PerformanceOptimizer (performance_optimizer.py) 并行化与缓存]
+        CFG[config.py (主/演示配置)]
     end
 
     %% 外部输入
@@ -219,6 +220,7 @@ graph TD
     style PO fill:#fff3e0
     style CFG fill:#f5f5f5
     style USER fill:#bbdefb
+
 ```
 
 **组件说明**:
