@@ -150,78 +150,58 @@ Neogenesis System 采用高度模块化和可扩展的架构设计，各组件�
 
 ### 核心组件概览
 
-```mermaid
-graph TD
-    subgraph Launch_and_Demo_Layer["启动与演示层"]
-        UI[start_demo.py / interactive_demo.py]
-    end
+@startuml
+package "启动与演示层" {
+    UI : start_demo.py / interactive_demo.py
+}
 
-    subgraph Core_Control_Layer["核心控制层"]
-        MC[MainController (controller.py) 五阶段流程总协调]
-    end
+package "核心控制层" {
+    MC : MainController (controller.py) 五阶段流程总协调
+}
 
-    subgraph Decision_Logic_Layer["决策逻辑层"]
-        PR[PriorReasoner (reasoner.py) 快速启发式分析]
-        RAG[RAGSeedGenerator (rag_seed_generator.py) RAG增强种子生成]
-        PG[PathGenerator (path_generator.py) 多路径思维生成]
-        MAB[MABConverger (mab_converger.py) Meta-MAB与学习]
-    end
+package "决策逻辑层" {
+    PR : PriorReasoner (reasoner.py) 快速启发式分析
+    RAG : RAGSeedGenerator (rag_seed_generator.py) RAG增强种子生成
+    PG : PathGenerator (path_generator.py) 多路径思维生成
+    MAB : MABConverger (mab_converger.py) Meta-MAB与学习
+}
 
-    subgraph Tools_and_Services_Layer["工具与服务层"]
-        DS[DeepSeekClient (deepseek_client.py) 强化版AI客户端]
-        SC[SearchClient (search_client.py) 网络搜索与验证]
-        PO[PerformanceOptimizer (performance_optimizer.py) 并行化与缓存]
-        CFG[config.py (主/演示配置)]
-    end
+package "工具与服务层" {
+    DS : DeepSeekClient (deepseek_client.py) 强化版AI客户端
+    SC : SearchClient (search_client.py) 网络搜索与验证
+    PO : PerformanceOptimizer (performance_optimizer.py) 并行化与缓存
+    CFG : config.py (主/演示配置)
+}
 
-    %% 外部输入
-    USER[用户输入/问题] --> UI
+' 控制流
+UI --> MC
+MC --> PR
+MC --> RAG
+MC --> PG
+MC --> MAB
 
-    %% 核心控制流
-    UI --> MC
-    MC --> PR
-    MC --> RAG
-    MC --> PG
-    MC --> MAB
+PR --> RAG
+RAG --> PG
+PG --> MAB
+MAB --> PG
 
-    %% 决策逻辑层内部关系
-    PR -.-> RAG
-    RAG -.-> PG
-    PG -.-> MAB
-    MAB -.-> PG
+RAG --> SC
+RAG --> DS
+PG --> DS
+MAB --> DS
+MC --> SC
+MC --> PO
 
-    %% 工具服务调用
-    RAG --> SC
-    RAG --> DS
-    PG --> DS
-    MAB --> DS
-    MC --> SC
-    MC -- 使用 --> PO
+MC --> CFG
+PR --> CFG
+RAG --> CFG
+PG --> CFG
+MAB --> CFG
+DS --> CFG
+SC --> CFG
+PO --> CFG
+@enduml
 
-    %% 配置依赖
-    MC -.-> CFG
-    PR -.-> CFG
-    RAG -.-> CFG
-    PG -.-> CFG
-    MAB -.-> CFG
-    DS -.-> CFG
-    SC -.-> CFG
-    PO -.-> CFG
-
-    %% 样式定义
-    style UI fill:#e1f5fe
-    style MC fill:#f3e5f5
-    style PR fill:#e8f5e9
-    style RAG fill:#e8f5e9
-    style PG fill:#e8f5e9
-    style MAB fill:#e8f5e9
-    style DS fill:#fff3e0
-    style SC fill:#fff3e0
-    style PO fill:#fff3e0
-    style CFG fill:#f5f5f5
-    style USER fill:#bbdefb
-
-```
 
 **组件说明**:
 
