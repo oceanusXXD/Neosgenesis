@@ -74,7 +74,7 @@ Neogenesis System 的核心价值在于其独特的架构设计，它将决策�
 我们摒弃了传统的"思考→执行→学习"模型，首创了在思考阶段即可学习的闭环流程。这使得AI能在投入实际成本前，就预判并规避错误的思考路径，极大提升了决策的质量和效率。
 
 ```mermaid
-graph TD
+flowchart LR
     subgraph Thinking_Process["AI 思考过程"]
         A[阶段一: 思维种子生成 (RAG-Enhanced Seed Generation)] --> B{阶段二: 种子方向验证 (Initial Feasibility Check)}
         B -->|通过验证| C[阶段三: 多路径思维展开 (Diverse Path Generation)]
@@ -97,8 +97,6 @@ graph TD
     style E fill:#e8f5e9
     style F fill:#ffecb3
     style G fill:#f3e5f5
-
-
 ```
 
 **专业价值**: 这种"思考即学习"的模式，使AI具备了前所未有的反思和预演能力。它模拟了人类专家在制定方案时，会反复在头脑中推演、评估不同方案可行性的过程，从而在早期阶段就淘汰劣质思路，聚焦于高潜力方向。
