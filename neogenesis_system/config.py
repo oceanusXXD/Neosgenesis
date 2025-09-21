@@ -255,7 +255,7 @@ LLM_PROVIDERS_CONFIG = {
         "features": ["chat", "coding", "chinese", "reasoning"],
         "cost_per_1k_tokens": {"input": 0.00014, "output": 0.00028},
         "context_window": 32768,
-        "enabled": True
+        "enabled": False
     },
     
     "openai": {
@@ -341,9 +341,9 @@ LLM_PROVIDERS_CONFIG = {
         "context_window": 4096,
         "enabled": False  # 默认禁用，需要本地Ollama服务
     },
-    "suanli": {
-    "display_name": "Suanli Qwen3 Free",
-    "provider_type": "suanli",
+    "qwen": {
+    "display_name": "qwen",
+    "provider_type": "qwen",
     "api_key_env": "SUANLI_API_KEY",       # 使用新的环境变量
     "default_model": "free:Qwen3-30B-A3B",
     "available_models": ["free:Qwen3-30B-A3B"],
@@ -356,7 +356,7 @@ LLM_PROVIDERS_CONFIG = {
     "request_interval": 1.0,
     "features": ["chat", "reasoning", "chinese"],
     "cost_per_1k_tokens": {"input": 0.0, "output": 0.0},  # 免费
-    "context_window": 128000,  # Qwen3 支持超长上下文
+    "context_window": 4096,  # Qwen3 支持超长上下文
     "enabled": True
 }
 }

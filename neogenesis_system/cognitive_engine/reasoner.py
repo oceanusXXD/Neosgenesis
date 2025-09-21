@@ -110,7 +110,7 @@ class PriorReasoner:
     
     def __init__(self, 
                  api_key: str = "",
-                 llm_manager: Optional[LLMManager] = None,
+                 llm_manager: Optional["LLMManager"] = None,
                  ollama_config: Optional[Dict[str, Any]] = None,
                  enable_llm: bool = True):
         """
@@ -149,7 +149,7 @@ class PriorReasoner:
         if self.enable_llm and self.ollama_client:
             logger.info("✅ Ollama客户端已连接，支持本地快速推理")
     
-    def _init_llm_capabilities(self, llm_manager: Optional[LLMManager], ollama_config: Optional[Dict[str, Any]]):
+    def _init_llm_capabilities(self, llm_manager: Optional["LLMManager"], ollama_config: Optional[Dict[str, Any]]):
         """
         初始化LLM能力
         

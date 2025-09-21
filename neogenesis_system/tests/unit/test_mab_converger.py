@@ -16,9 +16,9 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from meta_mab.mab_converger import MABConverger
-from meta_mab.data_structures import EnhancedDecisionArm, ReasoningPath
-
+from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+from neogenesis_system.cognitive_engine.path_generator import ReasoningPath
+from neogenesis_system.cognitive_engine.data_structures import EnhancedDecisionArm
 
 class TestMABConverger(unittest.TestCase):
     """MAB收敛器单元测试类"""
@@ -162,7 +162,7 @@ class TestMABConverger(unittest.TestCase):
     
     def test_reasoning_path_dual_id_system(self):
         """测试ReasoningPath的双层ID系统 - 🎯 根源修复版"""
-        from meta_mab.data_structures import ReasoningPath
+        from neogenesis_system.cognitive_engine.data_structures import ReasoningPath
         
         # 测试1：完整字段初始化（PathGenerator的正确输出）
         path = ReasoningPath(
@@ -196,7 +196,7 @@ class TestMABConverger(unittest.TestCase):
     
     def test_mab_learning_with_strategy_accumulation(self):
         """🎯 集成测试：验证MAB基于策略ID的学习累积"""
-        from meta_mab.data_structures import ReasoningPath
+        from neogenesis_system.cognitive_engine.data_structures import ReasoningPath
         
         # 🔧 清空预创建的策略，隔离测试环境
         self.mab_converger.path_arms.clear()

@@ -4,3 +4,4 @@ neogenesis_system/cognitive_engine/__pycache__/
 .log
 .pyc
 __pycache__/
+.env

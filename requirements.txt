@@ -9,6 +9,7 @@ requests
 httpx
 pillow
 aiohttp
+dotenv
 # Web Server Dependencies
 gunicorn
 uvicorn
@@ -16,3 +17,7 @@ fastapi
 
 # Configuration
 python-dotenv
+
+# test
+pytest
+pytest-cov

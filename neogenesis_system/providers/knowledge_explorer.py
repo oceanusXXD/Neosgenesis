@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 import json
-
+logger = logging.getLogger(__name__)
 try:
     from .search_tools import WebSearchClient
 except ImportError:
@@ -37,7 +37,7 @@ except ImportError:
     AnalysisTaskType = None
     logger.error("❌ SemanticAnalyzer 导入失败，KnowledgeExplorer将使用默认策略运行")
 
-logger = logging.getLogger(__name__)
+
 
 
 class ExplorationStrategy(Enum):

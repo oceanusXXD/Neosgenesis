@@ -16,12 +16,12 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from meta_mab.rag_seed_generator import (
+from neogenesis_system.providers.rag_seed_generator import (
     RAGSeedGenerator, 
     RAGSearchStrategy, 
     RAGInformationSynthesis
 )
-from meta_mab.utils.search_client import SearchResult, SearchResponse
+from neogenesis_system.providers.search_client import SearchResult, SearchResponse
 
 
 class TestRAGSeedGenerator(unittest.TestCase):

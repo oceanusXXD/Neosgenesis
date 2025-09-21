@@ -35,6 +35,7 @@ class LLMProvider(Enum):
     COHERE = "cohere"
     GOOGLE = "google"
     GROQ = "groq"
+    QWEN = "qwen"
 
 
 class LLMErrorType(Enum):
@@ -173,7 +174,8 @@ class LLMConfig:
                 LLMProvider.TOGETHER_AI: "togethercomputer/llama-2-7b-chat",
                 LLMProvider.COHERE: "command",
                 LLMProvider.GOOGLE: "gemini-pro",
-                LLMProvider.GROQ: "llama2-70b-4096"
+                LLMProvider.GROQ: "llama2-70b-4096",
+                LLMProvider.QWEN: "free:Qwen3-30B-A3B"
             }
             self.model_name = default_models.get(self.provider, "unknown")
 

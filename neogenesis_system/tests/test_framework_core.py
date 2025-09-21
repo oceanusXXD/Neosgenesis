@@ -16,12 +16,13 @@ import unittest
 import time
 import sys
 import os
+from typing import Any, Dict, Optional, List
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
-    from neogenesis_system.data_structures import (
+    from neogenesis_system.shared.data_structures import (
         Action, Plan, Observation, ExecutionContext, AgentState,
         ActionStatus, PlanStatus
     )
@@ -33,7 +34,7 @@ except ImportError:
     exec(open('neogenesis_system/data_structures.py', encoding='utf-8').read())
     
     from abc import ABC, abstractmethod
-    from typing import Any, Dict, List, Optional
+    
     
     class BasePlanner(ABC):
         def __init__(self, name: str, description: str):

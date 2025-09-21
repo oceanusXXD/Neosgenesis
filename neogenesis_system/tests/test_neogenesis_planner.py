@@ -23,10 +23,10 @@ from unittest.mock import Mock, MagicMock, patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 try:
-    from neogenesis_system.planners.neogenesis_planner import NeogenesisPlanner
+    from neogenesis_system.core.neogenesis_planner import NeogenesisPlanner
     from neogenesis_system.abstractions import BasePlanner
-    from neogenesis_system.data_structures import Plan, Action
-    from neogenesis_system.meta_mab.data_structures import ReasoningPath
+    from neogenesis_system.shared.data_structures import Plan, Action
+    from neogenesis_system.cognitive_engine.path_generator import ReasoningPath
 except ImportError:
     # 如果导入失败，直接执行文件内容
     exec(open('neogenesis_system/data_structures.py', encoding='utf-8').read())

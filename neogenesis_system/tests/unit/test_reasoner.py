@@ -15,7 +15,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from meta_mab.reasoner import PriorReasoner
+from cognitive_engine.reasoner import PriorReasoner
 
 
 class TestPriorReasoner(unittest.TestCase):

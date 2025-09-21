@@ -18,8 +18,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from meta_mab.mab_converger import MABConverger
-from meta_mab.data_structures import EnhancedDecisionArm, ReasoningPath
+from neogenesis_system.cognitive_engine.mab_converger import MABConverger
+from neogenesis_system.cognitive_engine.data_structures import EnhancedDecisionArm, ReasoningPath
 
 
 class TestPathCreationRobustness(unittest.TestCase):
@@ -306,7 +306,7 @@ class TestPathCreationRobustness(unittest.TestCase):
     
     # ==================== 错误处理测试 ====================
     
-    @patch('meta_mab.mab_converger.EnhancedDecisionArm')
+    @patch('neogenesis_system.cognitive_engine.data_structures.EnhancedDecisionArm')
     def test_path_creation_failure_handling(self, mock_arm_class):
         """测试路径创建失败时的错误处理"""
         # 模拟EnhancedDecisionArm创建失败
